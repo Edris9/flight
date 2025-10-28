@@ -15,7 +15,7 @@ export function useGameMethod() {
     toggleCollisionDetection: () => bridge.toggleCollisionDetection(),
     getCollisionDetection: (): boolean => bridge.getCollisionDetection(),
     getVehicleState: (): VehicleStateData | null => bridge.getVehicleState(),
-    teleportTo: (longitude: number, latitude: number, altitude: number, heading?: number) => 
+    teleportTo: (longitude: number, latitude: number, altitude: number, heading?: number) =>
       bridge.teleportTo(longitude, latitude, altitude, heading),
     restart: () => bridge.restart(),
     getQualitySettings: (): QualityConfig => bridge.getQualitySettings(),
@@ -25,6 +25,12 @@ export function useGameMethod() {
     setMode: (mode: 'play' | 'builder') => bridge.setMode(mode),
     getMode: () => bridge.getMode(),
     setThrottle: (percent: number) => bridge.setThrottle(percent),
+    startVoiceControl: () => bridge.startVoiceControl(),
+    stopVoiceControl: () => bridge.stopVoiceControl(),
+    toggleVoiceControl: () => bridge.toggleVoiceControl(),
+    isVoiceControlActive: () => bridge.isVoiceControlActive(),
+    setVoiceStatusCallback: (callback: (listening: boolean, transcript?: string) => void) =>
+      bridge.setVoiceStatusCallback(callback),
   };
 }
 
