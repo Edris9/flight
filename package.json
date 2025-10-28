@@ -11,6 +11,6 @@
   "devDependencies": {
     "concurrently": "^8.2.2",
     "dotenv-cli": "^7.4.2",
-    "wrangler": "^4.42.0"
+    "wrangler": "^4.42.0"dd
   }
 }
