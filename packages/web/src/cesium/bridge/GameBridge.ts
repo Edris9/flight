@@ -288,5 +288,27 @@ export class GameBridge extends TypedEventEmitter<GameEvents> {
   public setThrottle(percent: number): void {
     this.game.getInputManager().setThrottlePercent(percent * 100);
   }
+
+  public startVoiceControl(): void {
+    this.game.getVoiceInputManager().start();
+    console.log('🎤 Voice control started');
+  }
+
+  public stopVoiceControl(): void {
+    this.game.getVoiceInputManager().stop();
+    console.log('🔇 Voice control stopped');
+  }
+
+  public toggleVoiceControl(): void {
+    this.game.getVoiceInputManager().toggle();
+  }
+
+  public isVoiceControlActive(): boolean {
+    return this.game.getVoiceInputManager().isActive();
+  }
+
+  public setVoiceStatusCallback(callback: (listening: boolean, transcript?: string) => void): void {
+    this.game.getVoiceInputManager().setStatusChangeCallback(callback);
+  }
 }
 

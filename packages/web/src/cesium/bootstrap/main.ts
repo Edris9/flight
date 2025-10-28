@@ -7,6 +7,7 @@ import { InputManager } from '../input/InputManager';
 import { ObjectManager } from '../builder/ObjectManager';
 import { PlacementController } from '../builder/PlacementController';
 import { TouchInputManager } from '../input/TouchInputManager';
+import { VoiceInputManager } from '../input/VoiceInputManager';
 
 export class CesiumVehicleGame {
   private scene: Scene;
@@ -17,6 +18,7 @@ export class CesiumVehicleGame {
   private objectManager: ObjectManager;
   private placementController: PlacementController;
   private touchInputManager: TouchInputManager | null = null;
+  private voiceInputManager: VoiceInputManager;
 
   constructor(containerId: string = "cesiumContainer") {
     this.scene = new Scene(containerId);
@@ -24,6 +26,7 @@ export class CesiumVehicleGame {
     this.vehicleManager = new VehicleManager(this.scene);
     this.cameraManager = new CameraManager(this.scene.camera);
     this.inputManager = new InputManager();
+    this.voiceInputManager = new VoiceInputManager(this.inputManager);
     this.objectManager = new ObjectManager(this.scene.viewer);
     this.placementController = new PlacementController(this.scene.viewer, this.objectManager);
 
@@ -148,6 +151,10 @@ export class CesiumVehicleGame {
     return this.placementController;
   }
 
+  public getVoiceInputManager(): VoiceInputManager {
+    return this.voiceInputManager;
+  }
+
   public destroy(): void {
     this.stop();
     this.scene.stopEarthSpin();
@@ -155,6 +162,7 @@ export class CesiumVehicleGame {
     this.cameraManager.destroy();
     this.inputManager.destroy();
     this.touchInputManager?.destroy();
+    this.voiceInputManager.dispose();
   }
 }
 

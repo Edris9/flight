@@ -217,6 +217,17 @@ export class InputManager {
     this.targetSpeedCallback = callback;
   }
 
+  public emitAction(action: InputAction): void {
+    // For one-time actions, trigger and immediately reset
+    if (this.oneTimeActions.has(action)) {
+      this.setInputState(action, true);
+      setTimeout(() => this.setInputState(action, false), 0);
+    } else {
+      // For continuous actions, just trigger once
+      this.setInputState(action, true);
+    }
+  }
+
   public destroy(): void {
     document.removeEventListener('keydown', this.handleKeyDown.bind(this));
     document.removeEventListener('keyup', this.handleKeyUp.bind(this));
