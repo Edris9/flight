@@ -6,19 +6,18 @@ interface TokenSetupProps {
 }
 
 export function TokenSetup({ onComplete }: TokenSetupProps) {
-  const [mapboxToken, setMapboxToken] = useState('');
   const [cesiumToken, setCesiumToken] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!mapboxToken.trim() || !cesiumToken.trim()) {
-      setError('Both tokens are required');
+
+    if (!cesiumToken.trim()) {
+      setError('Cesium token is required');
       return;
     }
 
-    saveTokens(mapboxToken.trim(), cesiumToken.trim());
+    saveTokens(cesiumToken.trim());
     onComplete();
   };
 
@@ -28,43 +27,14 @@ export function TokenSetup({ onComplete }: TokenSetupProps) {
         <div className="text-center space-y-2">
           <h1 className="text-3xl font-bold text-white">🚀 Setup Required</h1>
           <p className="text-white/60">
-            Please provide your API tokens to continue
+            Please provide your Cesium Ion token to continue
+          </p>
+          <p className="text-xs text-white/40">
+            ℹ️ Using MapLibre (free) for minimap - no extra tokens needed!
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Mapbox Token */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-white/90">
-                Mapbox Access Token
-              </label>
-              <a
-                href="https://account.mapbox.com/access-tokens/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-400 hover:text-blue-300 transition-colors"
-              >
-                Get token →
-              </a>
-            </div>
-            <input
-              type="text"
-              value={mapboxToken}
-              onChange={(e) => setMapboxToken(e.target.value)}
-              placeholder="pk.eyJ1Ijoi..."
-              className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg 
-                       text-white placeholder:text-white/30
-                       focus:outline-none focus:border-blue-400/50 focus:bg-white/10
-                       transition-all duration-200 font-mono text-sm"
-            />
-            <div className="text-xs text-white/50 space-y-1">
-              <p>1. Go to <a href="https://account.mapbox.com/access-tokens/" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Mapbox Tokens</a></p>
-              <p>2. Create a new token or copy an existing one</p>
-              <p>3. Paste it above</p>
-            </div>
-          </div>
-
           {/* Cesium Token */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">
@@ -115,9 +85,8 @@ export function TokenSetup({ onComplete }: TokenSetupProps) {
           </button>
 
           <div className="text-xs text-white/40 text-center space-y-1">
-            <p>💡 Tip: For permanent setup, add tokens to your .env file:</p>
+            <p>💡 Tip: For permanent setup, add token to your .env file:</p>
             <code className="block text-white/50 font-mono">
-              VITE_MAPBOX_TOKEN=your_token_here<br />
               VITE_CESIUM_TOKEN=your_token_here
             </code>
           </div>
