@@ -1,11 +1,8 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import Map, { Marker, NavigationControl, type MapRef } from 'react-map-gl/mapbox';
+import Map, { Marker, NavigationControl, type MapRef } from 'react-map-gl/maplibre';
 import { useVehiclePosition } from '../hooks/useVehiclePosition';
 import { useGameMethod } from '../../../hooks/useGameMethod';
-import { getTokens } from '../../../../utils/tokenValidator';
-import 'mapbox-gl/dist/mapbox-gl.css';
-
-const MAPBOX_TOKEN = getTokens().mapbox;
+import 'maplibre-gl/dist/maplibre-gl.css';
 
 interface SearchResult {
   id: string;
@@ -61,11 +58,25 @@ export function MiniMap() {
 
     setIsSearching(true);
     try {
+      // Using Nominatim (OpenStreetMap) - free geocoding service
       const response = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?access_token=${MAPBOX_TOKEN}&limit=5`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Flight-Simulator-App'
+          }
+        }
       );
       const data = await response.json();
-      setSearchResults(data.features || []);
+
+      // Convert Nominatim format to our SearchResult format
+      const results: SearchResult[] = data.map((item: any) => ({
+        id: item.place_id.toString(),
+        place_name: item.display_name,
+        center: [parseFloat(item.lon), parseFloat(item.lat)]
+      }));
+
+      setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
@@ -244,7 +255,6 @@ export function MiniMap() {
             {/* Map */}
             <Map
               ref={mapRef}
-              mapboxAccessToken={MAPBOX_TOKEN}
               initialViewState={{
                 longitude: position.longitude,
                 latitude: position.latitude,
@@ -258,7 +268,7 @@ export function MiniMap() {
                 bearing: mapBearing,
               })}
               style={{ width: '100%', height: '100%' }}
-              mapStyle="mapbox://styles/mapbox/dark-v11"
+              mapStyle="https://tiles.openfreemap.org/styles/liberty"
               attributionControl={false}
               dragPan={isExpanded}
               scrollZoom={isExpanded}
