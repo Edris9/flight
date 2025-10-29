@@ -6,6 +6,8 @@ export function VoiceControl() {
   const [isListening, setIsListening] = useState(false);
   const [lastTranscript, setLastTranscript] = useState<string>('');
   const [showTranscript, setShowTranscript] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'searching' | 'found' | 'error'>('idle');
+  const [locationMessage, setLocationMessage] = useState<string>('');
 
   useEffect(() => {
     // Set up callback to receive voice status updates
@@ -84,17 +86,55 @@ export function VoiceControl() {
         <div className="glass-panel px-4 py-2 animate-fade-in">
           <p className="text-xs text-white/70">Kommando:</p>
           <p className="text-sm text-white font-medium">{lastTranscript}</p>
+          <p className="text-[10px] text-white/50 mt-1">
+            Öppna konsolen (F12) för debug-info
+          </p>
+        </div>
+      )}
+
+      {/* Location Search Status */}
+      {locationStatus !== 'idle' && (
+        <div className={`glass-panel px-4 py-2 animate-fade-in ${
+          locationStatus === 'searching' ? 'bg-blue-500/20' :
+          locationStatus === 'found' ? 'bg-green-500/20' :
+          'bg-red-500/20'
+        }`}>
+          <div className="flex items-center gap-2">
+            {locationStatus === 'searching' && (
+              <div className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+            )}
+            {locationStatus === 'found' && (
+              <span className="text-green-400">✓</span>
+            )}
+            {locationStatus === 'error' && (
+              <span className="text-red-400">✗</span>
+            )}
+            <div>
+              <p className="text-xs text-white font-medium">
+                {locationStatus === 'searching' && `Söker: ${locationMessage}`}
+                {locationStatus === 'found' && `Hittade: ${locationMessage}`}
+                {locationStatus === 'error' && `Kunde inte hitta: ${locationMessage}`}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
       {/* Help Text (only shown when active) */}
       {isListening && (
         <div className="glass-panel px-4 py-2 max-w-xs">
-          <p className="text-xs text-white/70 mb-1">Kommandon:</p>
+          <p className="text-xs text-white/70 mb-2 font-semibold">📍 Platser:</p>
+          <div className="text-xs text-white/60 space-y-1 mb-3">
+            <p><span className="text-yellow-400">"Flyga till Göteborg"</span></p>
+            <p><span className="text-yellow-400">"Flyga till Stockholm centrum"</span></p>
+            <p className="text-white/50 text-[10px] italic">Cirklar runt platsen med visuell markering</p>
+          </div>
+
+          <p className="text-xs text-white/70 mb-1 font-semibold">✈️ Flyg:</p>
           <div className="text-xs text-white/60 space-y-0.5">
             <p><span className="text-white/80">Gas, Bromsa</span> - Hastighet</p>
-            <p><span className="text-white/80">Upp, Ner</span> - H\u00f6jd</p>
-            <p><span className="text-white/80">V\u00e4nster, H\u00f6ger</span> - Sv\u00e4ng</p>
+            <p><span className="text-white/80">Upp, Ner</span> - Höjd</p>
+            <p><span className="text-white/80">Vänster, Höger</span> - Sväng</p>
             <p><span className="text-white/80">Stopp</span> - Sluta alla kommandon</p>
           </div>
         </div>
