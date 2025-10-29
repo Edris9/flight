@@ -8,6 +8,9 @@ import { ObjectManager } from '../builder/ObjectManager';
 import { PlacementController } from '../builder/PlacementController';
 import { TouchInputManager } from '../input/TouchInputManager';
 import { VoiceInputManager } from '../input/VoiceInputManager';
+import { LocationService } from '../services/LocationService';
+import { MarkerManager } from '../services/MarkerManager';
+import { OrbitMode } from '../modes/OrbitMode';
 
 export class CesiumVehicleGame {
   private scene: Scene;
@@ -19,6 +22,9 @@ export class CesiumVehicleGame {
   private placementController: PlacementController;
   private touchInputManager: TouchInputManager | null = null;
   private voiceInputManager: VoiceInputManager;
+  private locationService: LocationService;
+  private markerManager: MarkerManager;
+  private orbitMode: OrbitMode;
 
   constructor(containerId: string = "cesiumContainer") {
     this.scene = new Scene(containerId);
@@ -27,12 +33,16 @@ export class CesiumVehicleGame {
     this.cameraManager = new CameraManager(this.scene.camera);
     this.inputManager = new InputManager();
     this.voiceInputManager = new VoiceInputManager(this.inputManager);
+    this.locationService = new LocationService();
+    this.markerManager = new MarkerManager(this.scene.viewer);
+    this.orbitMode = new OrbitMode();
     this.objectManager = new ObjectManager(this.scene.viewer);
     this.placementController = new PlacementController(this.scene.viewer, this.objectManager);
 
     this.setupSystems();
     this.setupInputHandling();
     this.setupTouchControls(containerId);
+    this.setupVoiceControls();
   }
 
   private setupSystems(): void {
@@ -41,12 +51,57 @@ export class CesiumVehicleGame {
     this.gameLoop.addUpdatable({
       update: (deltaTime: number) => {
         this.placementController.update(deltaTime);
+        this.orbitMode.update(deltaTime);
       }
     });
-    
+
     this.vehicleManager.onVehicleChange((vehicle) => {
       this.cameraManager.setTarget(vehicle);
       console.log('📷 Camera target updated to new vehicle');
+    });
+  }
+
+  private setupVoiceControls(): void {
+    // Register location handler for "flyga till [plats]"
+    this.voiceInputManager.setLocationCallback(async (location: string) => {
+      console.log(`🗺️ Voice command: Fly to ${location}`);
+
+      // Search for location
+      const result = await this.locationService.searchLocation(location);
+
+      if (!result) {
+        console.error(`❌ Could not find location: ${location}`);
+        return;
+      }
+
+      console.log(`✅ Found: ${result.display_name}`);
+
+      // Create marker at the location
+      const position = Cesium.Cartesian3.fromDegrees(result.lon, result.lat, 100);
+
+      this.markerManager.addMarker({
+        position: position,
+        name: result.display_name,
+        radius: 800,
+        height: 100,
+      });
+
+      // Get current aircraft
+      const vehicle = this.vehicleManager.getActiveVehicle();
+      if (!vehicle) {
+        console.error('No active vehicle');
+        return;
+      }
+
+      // Start orbiting around the location
+      this.orbitMode.startOrbit(vehicle as any, {
+        center: position,
+        radius: 1200, // 1.2km orbit radius
+        altitude: 400, // 400m altitude
+        speed: 80, // 80 m/s (~180 mph)
+      });
+
+      console.log(`🔄 Orbiting around ${result.display_name}`);
     });
   }
 
@@ -155,6 +210,18 @@ export class CesiumVehicleGame {
     return this.voiceInputManager;
   }
 
+  public getLocationService(): LocationService {
+    return this.locationService;
+  }
+
+  public getMarkerManager(): MarkerManager {
+    return this.markerManager;
+  }
+
+  public getOrbitMode(): OrbitMode {
+    return this.orbitMode;
+  }
+
   public destroy(): void {
     this.stop();
     this.scene.stopEarthSpin();
@@ -163,6 +230,9 @@ export class CesiumVehicleGame {
     this.inputManager.destroy();
     this.touchInputManager?.destroy();
     this.voiceInputManager.dispose();
+    this.orbitMode.stopOrbit();
+    this.markerManager.clearAllMarkers();
+    this.locationService.clearCache();
   }
 }
 

@@ -90,11 +90,18 @@ export function VoiceControl() {
       {/* Help Text (only shown when active) */}
       {isListening && (
         <div className="glass-panel px-4 py-2 max-w-xs">
-          <p className="text-xs text-white/70 mb-1">Kommandon:</p>
+          <p className="text-xs text-white/70 mb-2 font-semibold">📍 Platser:</p>
+          <div className="text-xs text-white/60 space-y-1 mb-3">
+            <p><span className="text-yellow-400">"Flyga till Göteborg"</span></p>
+            <p><span className="text-yellow-400">"Flyga till Stockholm centrum"</span></p>
+            <p className="text-white/50 text-[10px] italic">Cirklar runt platsen med visuell markering</p>
+          </div>
+
+          <p className="text-xs text-white/70 mb-1 font-semibold">✈️ Flyg:</p>
           <div className="text-xs text-white/60 space-y-0.5">
             <p><span className="text-white/80">Gas, Bromsa</span> - Hastighet</p>
-            <p><span className="text-white/80">Upp, Ner</span> - H\u00f6jd</p>
-            <p><span className="text-white/80">V\u00e4nster, H\u00f6ger</span> - Sv\u00e4ng</p>
+            <p><span className="text-white/80">Upp, Ner</span> - Höjd</p>
+            <p><span className="text-white/80">Vänster, Höger</span> - Sväng</p>
             <p><span className="text-white/80">Stopp</span> - Sluta alla kommandon</p>
           </div>
         </div>

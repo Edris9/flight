@@ -10,9 +10,11 @@ declare global {
 
 export interface VoiceCommand {
   keywords: string[];
-  action: () => void;
+  action: (transcript?: string) => void;
   continuous?: boolean;
 }
+
+export type LocationCallback = (location: string) => Promise<void>;
 
 export class VoiceInputManager {
   private recognition: SpeechRecognition | null = null;
@@ -21,6 +23,9 @@ export class VoiceInputManager {
   private commands: VoiceCommand[] = [];
   private activeActions = new Set<string>();
   private onStatusChange?: (listening: boolean, transcript?: string) => void;
+  private onLocationRequest?: LocationCallback;
+  private lastTranscript = '';
+  private restartTimeout: number | null = null;
 
   constructor(inputManager: InputManager) {
     this.inputManager = inputManager;
@@ -40,12 +45,26 @@ export class VoiceInputManager {
     this.recognition = new SpeechRecognition();
     this.recognition.lang = 'sv-SE'; // Swedish
     this.recognition.continuous = true;
-    this.recognition.interimResults = false;
-    this.recognition.maxAlternatives = 1;
+    this.recognition.interimResults = true; // Enable interim results for better responsiveness
+    this.recognition.maxAlternatives = 3; // Get multiple alternatives
 
     this.recognition.onresult = (event) => {
       const last = event.results.length - 1;
-      const transcript = event.results[last][0].transcript.toLowerCase().trim();
+      const result = event.results[last];
+
+      // Only process final results to avoid duplicates
+      if (!result.isFinal) {
+        return;
+      }
+
+      const transcript = result[0].transcript.toLowerCase().trim();
+
+      // Avoid processing duplicate transcripts
+      if (transcript === this.lastTranscript) {
+        return;
+      }
+
+      this.lastTranscript = transcript;
 
       if (this.onStatusChange) {
         this.onStatusChange(true, transcript);
@@ -56,27 +75,62 @@ export class VoiceInputManager {
 
     this.recognition.onerror = (event) => {
       console.error('Speech recognition error:', event.error);
-      if (event.error === 'no-speech' || event.error === 'audio-capture') {
-        // These are non-critical errors, continue listening
+
+      // Don't stop on these non-critical errors
+      if (event.error === 'no-speech' || event.error === 'audio-capture' || event.error === 'aborted') {
+        this.scheduleRestart();
         return;
       }
-      this.stop();
+
+      // Stop on critical errors
+      if (event.error === 'not-allowed' || event.error === 'service-not-allowed') {
+        console.error('Microphone access denied');
+        this.stop();
+      }
     };
 
     this.recognition.onend = () => {
       // Auto-restart if we're supposed to be listening
       if (this.isListening) {
-        setTimeout(() => {
-          if (this.isListening && this.recognition) {
-            this.recognition.start();
-          }
-        }, 100);
+        this.scheduleRestart();
       }
     };
   }
 
+  private scheduleRestart(): void {
+    // Clear existing restart timeout
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+    }
+
+    // Schedule restart after a short delay
+    this.restartTimeout = window.setTimeout(() => {
+      if (this.isListening && this.recognition) {
+        try {
+          this.recognition.start();
+          console.log('🎤 Voice recognition restarted');
+        } catch (error) {
+          // Recognition might already be running
+          console.log('Voice recognition already running or error:', error);
+        }
+      }
+    }, 200);
+  }
+
   private setupCommands(): void {
     this.commands = [
+      // Location-based commands - check these FIRST
+      {
+        keywords: ['flyga till', 'flyg till', 'åk till', 'till'],
+        action: (transcript) => this.handleLocationCommand(transcript || ''),
+      },
+
+      // Stop command - prioritize this
+      {
+        keywords: ['sluta', 'stopp', 'avbryt', 'stanna'],
+        action: () => this.clearAllActions(),
+      },
+
       // Altitude control
       {
         keywords: ['upp', 'högre', 'stig', 'höj'],
@@ -87,10 +141,6 @@ export class VoiceInputManager {
         keywords: ['ner', 'lägre', 'sjunk', 'sänk'],
         action: () => this.activateAction('altitudeDown', true),
         continuous: true,
-      },
-      {
-        keywords: ['sluta', 'stopp', 'avbryt'],
-        action: () => this.clearAllActions(),
       },
 
       // Turn control
@@ -145,11 +195,60 @@ export class VoiceInputManager {
     ];
   }
 
-  private processCommand(transcript: string): void {
-    console.log('Voice command:', transcript);
+  private async handleLocationCommand(transcript: string): Promise<void> {
+    console.log('📍 Processing location command:', transcript);
 
-    // Check for "stopp" first to clear all actions
-    if (transcript.includes('stopp') || transcript.includes('sluta')) {
+    // Extract location from transcript
+    // Look for patterns like "flyga till göteborg", "åk till stockholm centrum"
+    const patterns = [
+      /(?:flyga? till|åk till|till)\s+(.+)/i,
+    ];
+
+    let location = '';
+    for (const pattern of patterns) {
+      const match = transcript.match(pattern);
+      if (match && match[1]) {
+        location = match[1].trim();
+        break;
+      }
+    }
+
+    if (!location) {
+      console.log('Could not extract location from:', transcript);
+      return;
+    }
+
+    console.log('🗺️ Extracted location:', location);
+
+    // Call the location callback if registered
+    if (this.onLocationRequest) {
+      try {
+        await this.onLocationRequest(location);
+      } catch (error) {
+        console.error('Error handling location request:', error);
+      }
+    } else {
+      console.warn('No location request handler registered');
+    }
+  }
+
+  private processCommand(transcript: string): void {
+    console.log('🎤 Voice command:', transcript);
+
+    // Check for location commands first
+    if (transcript.includes('flyga till') || transcript.includes('flyg till') ||
+        transcript.includes('åk till') || transcript.match(/^till\s+/)) {
+      for (const command of this.commands) {
+        if (command.keywords.some(kw => transcript.includes(kw))) {
+          command.action(transcript);
+          return;
+        }
+      }
+    }
+
+    // Check for "stopp" to clear all actions
+    if (transcript.includes('stopp') || transcript.includes('sluta') ||
+        transcript.includes('stanna') || transcript.includes('avbryt')) {
       this.clearAllActions();
       return;
     }
@@ -158,13 +257,13 @@ export class VoiceInputManager {
     for (const command of this.commands) {
       for (const keyword of command.keywords) {
         if (transcript.includes(keyword)) {
-          command.action();
+          command.action(transcript);
           return;
         }
       }
     }
 
-    console.log('No matching command found for:', transcript);
+    console.log('❓ No matching command found for:', transcript);
   }
 
   private activateAction(action: InputAction, continuous: boolean): void {
@@ -172,10 +271,10 @@ export class VoiceInputManager {
       this.activeActions.add(action);
       this.inputManager.emitAction(action);
 
-      // Auto-clear after 2 seconds if not refreshed
+      // Auto-clear after 3 seconds if not refreshed
       setTimeout(() => {
         this.activeActions.delete(action);
-      }, 2000);
+      }, 3000);
     } else {
       this.inputManager.emitAction(action);
     }
@@ -183,7 +282,11 @@ export class VoiceInputManager {
 
   private clearAllActions(): void {
     this.activeActions.clear();
-    console.log('All voice actions cleared');
+    console.log('🛑 All voice actions cleared');
+  }
+
+  public setLocationCallback(callback: LocationCallback): void {
+    this.onLocationRequest = callback;
   }
 
   public start(): void {
@@ -197,9 +300,11 @@ export class VoiceInputManager {
     }
 
     this.isListening = true;
+    this.lastTranscript = ''; // Reset last transcript
+
     try {
       this.recognition.start();
-      console.log('Voice control started');
+      console.log('🎤 Voice control started');
       if (this.onStatusChange) {
         this.onStatusChange(true);
       }
@@ -217,9 +322,15 @@ export class VoiceInputManager {
     this.isListening = false;
     this.clearAllActions();
 
+    // Clear restart timeout
+    if (this.restartTimeout) {
+      clearTimeout(this.restartTimeout);
+      this.restartTimeout = null;
+    }
+
     try {
       this.recognition.stop();
-      console.log('Voice control stopped');
+      console.log('🔇 Voice control stopped');
       if (this.onStatusChange) {
         this.onStatusChange(false);
       }
@@ -249,5 +360,6 @@ export class VoiceInputManager {
     this.recognition = null;
     this.commands = [];
     this.activeActions.clear();
+    this.onLocationRequest = undefined;
   }
 }
