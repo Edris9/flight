@@ -65,16 +65,20 @@ export class CesiumVehicleGame {
     // Register location handler for "flyga till [plats]"
     this.voiceInputManager.setLocationCallback(async (location: string) => {
       console.log(`🗺️ Voice command: Fly to ${location}`);
+      console.log(`📍 Searching for location: "${location}"`);
 
       // Search for location
       const result = await this.locationService.searchLocation(location);
 
       if (!result) {
         console.error(`❌ Could not find location: ${location}`);
+        console.error(`   Tried searching for: "${location}"`);
+        console.error(`   Try more specific names like "Göteborg centrum" or "Stockholm"`);
         return;
       }
 
       console.log(`✅ Found: ${result.display_name}`);
+      console.log(`   Coordinates: ${result.lat}, ${result.lon}`);
 
       // Create marker at the location
       const position = Cesium.Cartesian3.fromDegrees(result.lon, result.lat, 100);
@@ -85,6 +89,8 @@ export class CesiumVehicleGame {
         radius: 800,
         height: 100,
       });
+
+      console.log(`🎯 Marker created at ${result.display_name}`);
 
       // Get current aircraft
       const vehicle = this.vehicleManager.getActiveVehicle();
@@ -102,6 +108,12 @@ export class CesiumVehicleGame {
       });
 
       console.log(`🔄 Orbiting around ${result.display_name}`);
+      console.log(`   Orbit radius: 1200m, Altitude: 400m, Speed: 80m/s`);
+    });
+
+    // Register status callback for UI feedback
+    this.voiceInputManager.setLocationStatusCallback((status, message) => {
+      console.log(`📊 Location status: ${status} - ${message || ''}`);
     });
   }
 

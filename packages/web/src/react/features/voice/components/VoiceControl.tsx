@@ -6,6 +6,8 @@ export function VoiceControl() {
   const [isListening, setIsListening] = useState(false);
   const [lastTranscript, setLastTranscript] = useState<string>('');
   const [showTranscript, setShowTranscript] = useState(false);
+  const [locationStatus, setLocationStatus] = useState<'idle' | 'searching' | 'found' | 'error'>('idle');
+  const [locationMessage, setLocationMessage] = useState<string>('');
 
   useEffect(() => {
     // Set up callback to receive voice status updates
@@ -84,6 +86,37 @@ export function VoiceControl() {
         <div className="glass-panel px-4 py-2 animate-fade-in">
           <p className="text-xs text-white/70">Kommando:</p>
           <p className="text-sm text-white font-medium">{lastTranscript}</p>
+          <p className="text-[10px] text-white/50 mt-1">
+            Öppna konsolen (F12) för debug-info
+          </p>
+        </div>
+      )}
+
+      {/* Location Search Status */}
+      {locationStatus !== 'idle' && (
+        <div className={`glass-panel px-4 py-2 animate-fade-in ${
+          locationStatus === 'searching' ? 'bg-blue-500/20' :
+          locationStatus === 'found' ? 'bg-green-500/20' :
+          'bg-red-500/20'
+        }`}>
+          <div className="flex items-center gap-2">
+            {locationStatus === 'searching' && (
+              <div className="w-3 h-3 border-2 border-white/50 border-t-white rounded-full animate-spin" />
+            )}
+            {locationStatus === 'found' && (
+              <span className="text-green-400">✓</span>
+            )}
+            {locationStatus === 'error' && (
+              <span className="text-red-400">✗</span>
+            )}
+            <div>
+              <p className="text-xs text-white font-medium">
+                {locationStatus === 'searching' && `Söker: ${locationMessage}`}
+                {locationStatus === 'found' && `Hittade: ${locationMessage}`}
+                {locationStatus === 'error' && `Kunde inte hitta: ${locationMessage}`}
+              </p>
+            </div>
+          </div>
         </div>
       )}
 

@@ -15,6 +15,7 @@ export interface VoiceCommand {
 }
 
 export type LocationCallback = (location: string) => Promise<void>;
+export type LocationStatusCallback = (status: 'searching' | 'found' | 'error', message?: string) => void;
 
 export class VoiceInputManager {
   private recognition: SpeechRecognition | null = null;
@@ -24,6 +25,7 @@ export class VoiceInputManager {
   private activeActions = new Set<string>();
   private onStatusChange?: (listening: boolean, transcript?: string) => void;
   private onLocationRequest?: LocationCallback;
+  private onLocationStatus?: LocationStatusCallback;
   private lastTranscript = '';
   private restartTimeout: number | null = null;
 
@@ -46,31 +48,38 @@ export class VoiceInputManager {
     this.recognition.lang = 'sv-SE'; // Swedish
     this.recognition.continuous = true;
     this.recognition.interimResults = true; // Enable interim results for better responsiveness
-    this.recognition.maxAlternatives = 3; // Get multiple alternatives
+    this.recognition.maxAlternatives = 5; // Get MORE alternatives!
 
     this.recognition.onresult = (event) => {
       const last = event.results.length - 1;
       const result = event.results[last];
 
-      // Only process final results to avoid duplicates
-      if (!result.isFinal) {
-        return;
-      }
-
+      // Process both interim and final for better detection
       const transcript = result[0].transcript.toLowerCase().trim();
 
-      // Avoid processing duplicate transcripts
-      if (transcript === this.lastTranscript) {
-        return;
+      // Log all alternatives for debugging
+      if (result.isFinal) {
+        console.log('🎤 FINAL transcript:', transcript);
+
+        // Show alternatives
+        for (let i = 0; i < result.length; i++) {
+          console.log(`  Alternative ${i+1}:`, result[i].transcript);
+        }
+
+        // Avoid processing duplicate transcripts
+        if (transcript === this.lastTranscript) {
+          console.log('  ⚠️ Duplicate detected, skipping');
+          return;
+        }
+
+        this.lastTranscript = transcript;
+
+        if (this.onStatusChange) {
+          this.onStatusChange(true, transcript);
+        }
+
+        this.processCommand(transcript);
       }
-
-      this.lastTranscript = transcript;
-
-      if (this.onStatusChange) {
-        this.onStatusChange(true, transcript);
-      }
-
-      this.processCommand(transcript);
     };
 
     this.recognition.onerror = (event) => {
@@ -111,7 +120,7 @@ export class VoiceInputManager {
           console.log('🎤 Voice recognition restarted');
         } catch (error) {
           // Recognition might already be running
-          console.log('Voice recognition already running or error:', error);
+          console.log('Voice recognition already running');
         }
       }
     }, 200);
@@ -121,7 +130,7 @@ export class VoiceInputManager {
     this.commands = [
       // Location-based commands - check these FIRST
       {
-        keywords: ['flyga till', 'flyg till', 'åk till', 'till'],
+        keywords: ['flyg', 'åk', 'till'],
         action: (transcript) => this.handleLocationCommand(transcript || ''),
       },
 
@@ -196,59 +205,84 @@ export class VoiceInputManager {
   }
 
   private async handleLocationCommand(transcript: string): Promise<void> {
-    console.log('📍 Processing location command:', transcript);
+    console.log('📍 Checking if location command:', transcript);
 
-    // Extract location from transcript
-    // Look for patterns like "flyga till göteborg", "åk till stockholm centrum"
+    // Much more flexible pattern matching for Swedish pronunciation
+    // Matches: "flyga till", "flygga till", "flygg till", "flyg till", "åk till", "till X"
     const patterns = [
-      /(?:flyga? till|åk till|till)\s+(.+)/i,
+      /(?:fly[gk]+a?\s+till|åk\s+till)\s+(.+)/i,
+      /till\s+([a-zåäö\s]+(?:centrum|center|sentrum|stad|city)?)/i,
     ];
 
     let location = '';
+    let matchedPattern = false;
+
     for (const pattern of patterns) {
       const match = transcript.match(pattern);
       if (match && match[1]) {
         location = match[1].trim();
+        matchedPattern = true;
+        console.log('✅ Pattern matched:', pattern, '→ Location:', location);
         break;
       }
     }
 
-    if (!location) {
-      console.log('Could not extract location from:', transcript);
+    if (!matchedPattern) {
+      // Not a location command
+      console.log('❌ No location pattern matched');
+      return;
+    }
+
+    if (!location || location.length < 3) {
+      console.log('❌ Location too short:', location);
       return;
     }
 
     console.log('🗺️ Extracted location:', location);
 
+    // Notify searching
+    if (this.onLocationStatus) {
+      this.onLocationStatus('searching', location);
+    }
+
     // Call the location callback if registered
     if (this.onLocationRequest) {
       try {
         await this.onLocationRequest(location);
+        if (this.onLocationStatus) {
+          this.onLocationStatus('found', location);
+        }
       } catch (error) {
         console.error('Error handling location request:', error);
+        if (this.onLocationStatus) {
+          this.onLocationStatus('error', location);
+        }
       }
     } else {
-      console.warn('No location request handler registered');
+      console.warn('⚠️ No location request handler registered');
     }
   }
 
-  private processCommand(transcript: string): void {
-    console.log('🎤 Voice command:', transcript);
+  private isLocationCommand(transcript: string): boolean {
+    // Check if this looks like a location command
+    const locationWords = ['flyg', 'flygga', 'flygg', 'åk', 'till'];
+    return locationWords.some(word => transcript.includes(word));
+  }
 
-    // Check for location commands first
-    if (transcript.includes('flyga till') || transcript.includes('flyg till') ||
-        transcript.includes('åk till') || transcript.match(/^till\s+/)) {
-      for (const command of this.commands) {
-        if (command.keywords.some(kw => transcript.includes(kw))) {
-          command.action(transcript);
-          return;
-        }
-      }
+  private processCommand(transcript: string): void {
+    console.log('🎤 Processing command:', transcript);
+
+    // Check for location commands FIRST - before other commands
+    if (this.isLocationCommand(transcript)) {
+      console.log('🗺️ Detected location command, routing to handleLocationCommand');
+      this.handleLocationCommand(transcript);
+      return; // Important! Don't process other commands
     }
 
     // Check for "stopp" to clear all actions
     if (transcript.includes('stopp') || transcript.includes('sluta') ||
         transcript.includes('stanna') || transcript.includes('avbryt')) {
+      console.log('🛑 Stop command detected');
       this.clearAllActions();
       return;
     }
@@ -257,6 +291,7 @@ export class VoiceInputManager {
     for (const command of this.commands) {
       for (const keyword of command.keywords) {
         if (transcript.includes(keyword)) {
+          console.log('✅ Matched keyword:', keyword);
           command.action(transcript);
           return;
         }
@@ -287,6 +322,10 @@ export class VoiceInputManager {
 
   public setLocationCallback(callback: LocationCallback): void {
     this.onLocationRequest = callback;
+  }
+
+  public setLocationStatusCallback(callback: LocationStatusCallback): void {
+    this.onLocationStatus = callback;
   }
 
   public start(): void {
@@ -361,5 +400,6 @@ export class VoiceInputManager {
     this.commands = [];
     this.activeActions.clear();
     this.onLocationRequest = undefined;
+    this.onLocationStatus = undefined;
   }
 }
