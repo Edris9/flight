@@ -168,8 +168,8 @@ export class VehicleManager implements Updatable {
     );
 
     const drone = new Drone(id, {
-      modelUrl: './plane.glb',  // TODO: Replace with a proper drone 3D model
-      scale: 2,  // Smaller scale than aircraft
+      modelUrl: './drone.glb',
+      scale: 5,  // Adjust scale based on your drone model size
       position: spawnPosition,
       heading
     });
