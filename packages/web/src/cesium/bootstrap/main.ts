@@ -163,19 +163,19 @@ export class CesiumVehicleGame {
   }
 
   public async startCinematicSequence(): Promise<void> {
-    const spawnPosition = Cesium.Cartesian3.fromDegrees(11.9746, 57.7089, 200);
-    
+    const spawnPosition = Cesium.Cartesian3.fromDegrees(11.9746, 57.7089, 150);
+
     console.log('🎬 Starting cinematic sequence...');
-    
+
     this.scene.startEarthSpin();
     await this.delay(3000);
-    
+
     this.scene.stopEarthSpin();
     await this.scene.zoomToLocation(spawnPosition, 4500);
-    
-    console.log('✈️ Spawning aircraft...');
-    const aircraft = await this.vehicleManager.spawnAircraft();
-    this.cameraManager.setTarget(aircraft);
+
+    console.log('🚁 Spawning drone...');
+    const drone = await this.vehicleManager.spawnDrone();
+    this.cameraManager.setTarget(drone);
     this.start();
     
     console.log('🎮 Ready to fly!');

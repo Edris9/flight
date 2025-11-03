@@ -1,7 +1,7 @@
 import * as Cesium from 'cesium';
 import { Vehicle } from '../vehicles/Vehicle';
 import { Car } from '../vehicles/car/Car';
-import { Aircraft } from '../vehicles/aircraft/Aircraft';
+import { Drone } from '../vehicles/drone/Drone';
 import { Scene } from '../core/Scene';
 import { Updatable } from '../core/GameLoop';
 import { InputManager } from '../input/InputManager';
@@ -160,23 +160,23 @@ export class VehicleManager implements Updatable {
     return car;
   }
 
-  public async spawnAircraft(id: string = 'aircraft', position?: Cesium.Cartesian3, heading: number = 0): Promise<Vehicle> {
+  public async spawnDrone(id: string = 'drone', position?: Cesium.Cartesian3, heading: number = 0): Promise<Vehicle> {
     const spawnPosition = position || Cesium.Cartesian3.fromDegrees(
       DEFAULT_SPAWN_LOCATION.lng,
       DEFAULT_SPAWN_LOCATION.lat,
-      200
+      150  // Spawn at 150m height (between car and aircraft)
     );
-    
-    const aircraft = new Aircraft(id, {
-      modelUrl: './plane.glb',
-      scale: 5,
+
+    const drone = new Drone(id, {
+      modelUrl: './plane.glb',  // TODO: Replace with a proper drone 3D model
+      scale: 2,  // Smaller scale than aircraft
       position: spawnPosition,
       heading
     });
 
-    await this.addVehicle(aircraft);
-    this.scene.setVehicleQualityMode('aircraft');
-    return aircraft;
+    await this.addVehicle(drone);
+    this.scene.setVehicleQualityMode('aircraft');  // Use aircraft quality mode for flying vehicles
+    return drone;
   }
 
   public async toggleVehicleType(): Promise<void> {
@@ -184,14 +184,14 @@ export class VehicleManager implements Updatable {
     if (!active) return;
 
     const state = active.getState();
-    const isAircraft = active instanceof Aircraft;
+    const isDrone = active instanceof Drone;
 
-    if (isAircraft) {
-      console.log('🛬 Switching to Vehicle');
+    if (isDrone) {
+      console.log('🛬 Switching to Car');
       await this.spawnCar('car', state.position, state.heading);
     } else {
-      console.log('🛫 Switching to Aircraft');
-      await this.spawnAircraft('aircraft', state.position, state.heading);
+      console.log('🚁 Switching to Drone');
+      await this.spawnDrone('drone', state.position, state.heading);
     }
   }
 
@@ -199,16 +199,16 @@ export class VehicleManager implements Updatable {
     const active = this.activeVehicle;
     if (!active) return;
 
-    const isAircraft = active instanceof Aircraft;
+    const isDrone = active instanceof Drone;
     const originalSpawn = Cesium.Cartesian3.fromDegrees(
       DEFAULT_SPAWN_LOCATION.lng,
       DEFAULT_SPAWN_LOCATION.lat,
-      isAircraft ? 200 : 100
+      isDrone ? 150 : 100  // Drone at 150m, car at 100m
     );
     const heading = 0;
 
-    if (isAircraft) {
-      await this.spawnAircraft('aircraft', originalSpawn, heading);
+    if (isDrone) {
+      await this.spawnDrone('drone', originalSpawn, heading);
     } else {
       await this.spawnCar('car', originalSpawn, heading);
     }
