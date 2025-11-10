@@ -17,7 +17,7 @@ export function TokenSetup({ onComplete }: TokenSetupProps) {
       return;
     }
 
-    saveTokens('', cesiumToken.trim()); // Tom sträng för mapbox
+    saveTokens(cesiumToken.trim()); // Only Cesium token is required
     onComplete();
   };
 
