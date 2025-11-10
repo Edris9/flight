@@ -261,7 +261,23 @@ export function MiniMap() {
                 bearing: mapBearing,
               })}
               style={{ width: '100%', height: '100%' }}
-              mapStyle="https://demotiles.maplibre.org/style.json"
+              mapStyle={{
+                "version": 8,
+                "sources": {
+                  "osm": {
+                    "type": "raster",
+                    "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
+                    "tileSize": 256
+                  }
+                },
+                "layers": [
+                  {
+                    "id": "osm",
+                    "type": "raster",
+                    "source": "osm"
+                  }
+                ]
+              }}
           
               attributionControl={false}
               dragPan={isExpanded}
