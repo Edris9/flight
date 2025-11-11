@@ -27,7 +27,8 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
   const [isDestinationOpen, setIsDestinationOpen] = useState(false);
   const [destinationQuery, setDestinationQuery] = useState('');
   const { mode } = useGameMode();
-  const { teleportTo } = useGameMethod(); // Lägg till denna
+  const { teleportTo, startOrbitMode } = useGameMethod();
+  // const { teleportTo } = useGameMethod(); // Lägg till denna
   const handleDestinationSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!destinationQuery.trim()) return;
@@ -36,7 +37,10 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
     // Kolla landmarks först
     if (swedishLandmarks[query]) {
       const landmark = swedishLandmarks[query];
-      teleportTo(landmark.lon, landmark.lat, 1000, 0);
+      
+      // Aktivera automatisk granskning:
+      startOrbitMode(landmark.lon, landmark.lat, 500, 150);
+      
       setIsDestinationOpen(false);
       setDestinationQuery('');
       return;
