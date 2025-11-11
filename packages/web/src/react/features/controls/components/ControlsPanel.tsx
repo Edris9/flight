@@ -5,6 +5,23 @@ import { VEHICLE_CONTROLS, CAMERA_CONTROLS, MODE_CONTROLS, BUILDER_CONTROLS } fr
 import { useGameMode } from '../../../hooks/useGameMode';
 import { useGameMethod } from '../../../hooks/useGameMethod';
 
+const swedishLandmarks: Record<string, { lat: number; lon: number; name: string }> = {
+  // Stockholm
+  "gamla stan stockholm": { lat: 59.3251, lon: 18.0719, name: "Gamla Stan" },
+  "globen stockholm": { lat: 59.2932, lon: 18.0837, name: "Globen" },
+  "stadshuset stockholm": { lat: 59.3275, lon: 18.0540, name: "Stockholms Stadshus" },
+  "skansen stockholm": { lat: 59.3264, lon: 18.1031, name: "Skansen" },
+  
+  // Göteborg  
+  "stora kyrkan göteborg": { lat: 57.6489, lon: 11.9746, name: "Domkyrkan" },
+  "liseberg göteborg": { lat: 57.6956, lon: 11.9904, name: "Liseberg" },
+  "göteborgs konstmuseum": { lat: 57.6968, lon: 11.9754, name: "Konstmuseum" },
+  
+  // Malmö
+  "turning torso malmö": { lat: 55.6135, lon: 12.9758, name: "Turning Torso" },
+  "stortorget malmö": { lat: 55.6045, lon: 12.9915, name: "Stortorget" },
+  "malmöhus slott": { lat: 55.6034, lon: 12.9851, name: "Malmöhus" },
+};
   export function ControlsPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDestinationOpen, setIsDestinationOpen] = useState(false);
@@ -14,6 +31,16 @@ import { useGameMethod } from '../../../hooks/useGameMethod';
   const handleDestinationSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!destinationQuery.trim()) return;
+    const query = destinationQuery.toLowerCase().trim();
+  
+    // Kolla landmarks först
+    if (swedishLandmarks[query]) {
+      const landmark = swedishLandmarks[query];
+      teleportTo(landmark.lon, landmark.lat, 1000, 0);
+      setIsDestinationOpen(false);
+      setDestinationQuery('');
+      return;
+    }
 
     try {
       const response = await fetch(
