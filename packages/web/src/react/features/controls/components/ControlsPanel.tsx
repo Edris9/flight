@@ -25,10 +25,13 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
   export function ControlsPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDestinationOpen, setIsDestinationOpen] = useState(false);
+  const [isAiInspectionOpen, setIsAiInspectionOpen] = useState(false);
   const [destinationQuery, setDestinationQuery] = useState('');
   const { mode } = useGameMode();
   const { teleportTo, startOrbitMode } = useGameMethod();
   // const { teleportTo } = useGameMethod(); // Lägg till denna
+  {/* Destination Button */}
+
   const handleDestinationSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!destinationQuery.trim()) return;
@@ -38,8 +41,8 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
     if (swedishLandmarks[query]) {
       const landmark = swedishLandmarks[query];
       
-      // Aktivera automatisk granskning:
-      startOrbitMode(landmark.lon, landmark.lat, 500, 150);
+      // Bara vanlig teleport, ingen orbit:
+      teleportTo(landmark.lon, landmark.lat, 1000, 0);
       
       setIsDestinationOpen(false);
       setDestinationQuery('');
@@ -86,6 +89,9 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
       >
         <span className="group-hover:scale-110 transition-transform">?</span>
       </button>
+
+
+
       {/* Destination Button */}
       <button
         onClick={() => setIsDestinationOpen(!isDestinationOpen)}
@@ -97,6 +103,22 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
         <span className="group-hover:scale-110 transition-transform">🎯</span>
       </button>
 
+
+
+      {/* AI Granskning Button - FLYTTA HIT UTANFÖR PANELEN */}
+      <button
+        onClick={() => setIsAiInspectionOpen(!isAiInspectionOpen)}
+        className="fixed bottom-8 left-40 z-50 w-12 h-12 flex items-center justify-center
+                  glass-panel hover:bg-white/10 transition-all duration-300
+                  text-white/60 hover:text-white text-lg group"
+        title="AI Granskning"
+      >
+        <span className="group-hover:scale-110 transition-transform">🤖</span>
+      </button>
+
+
+
+
       {/* Destination Search Panel */}
       {isDestinationOpen && (
         <div className="fixed bottom-24 left-24 z-50 animate-fade-in">
@@ -106,6 +128,9 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
                 type="text"
                 value={destinationQuery}
                 onChange={(e) => setDestinationQuery(e.target.value)}
+                onKeyDown={(e) => e.stopPropagation()}
+                onKeyUp={(e) => e.stopPropagation()}
+                onKeyPress={(e) => e.stopPropagation()}
                 placeholder="Enter city or address..."
                 className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg 
                           text-white placeholder:text-white/30
@@ -118,6 +143,38 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
                           text-white rounded-lg transition-colors"
               >
                 Fly There
+              </button>
+            </form>
+          </Panel>
+        </div>
+      )}
+
+
+      {/* AI Inspection Panel */}
+      {isAiInspectionOpen && (
+        <div className="fixed bottom-24 left-40 z-50 animate-fade-in">
+          <Panel title="AI Granskning" className="min-w-[280px]">
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              // TODO: AI granskning logik här
+            }}>
+              <input
+                type="text"
+                onKeyDown={(e) => e.stopPropagation()}
+                onKeyUp={(e) => e.stopPropagation()}
+                onKeyPress={(e) => e.stopPropagation()}
+                placeholder="Område att granska..."
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg 
+                          text-white placeholder:text-white/30
+                          focus:outline-none focus:border-green-400/50"
+                autoFocus
+              />
+              <button
+                type="submit"
+                className="w-full mt-2 px-4 py-2 bg-green-500 hover:bg-green-600 
+                          text-white rounded-lg transition-colors"
+              >
+                Starta AI Granskning
               </button>
             </form>
           </Panel>
