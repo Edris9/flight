@@ -15,8 +15,8 @@ export function useGameMethod() {
       bridge.teleportTo(longitude, latitude, altitude, heading),
     
     // Lägg till denna nya funktion:
-    startOrbitMode: (centerLon: number, centerLat: number, radius: number = 500, altitude: number = 150) => 
-  bridge.startOrbitMode(centerLon, centerLat, radius, altitude),
+    startOrbitMode: (centerLon: number, centerLat: number, radius: number = 300, altitude: number = 150, speed: number = 0.02) => 
+      bridge.startOrbitMode(centerLon, centerLat, radius, altitude, speed),
       
     restart: () => bridge.restart(),
     toggleRoverMode: () => bridge.toggleRoverMode(),

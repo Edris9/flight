@@ -5,78 +5,124 @@ import { VEHICLE_CONTROLS, CAMERA_CONTROLS, MODE_CONTROLS, BUILDER_CONTROLS } fr
 import { useGameMode } from '../../../hooks/useGameMode';
 import { useGameMethod } from '../../../hooks/useGameMethod';
 
-const swedishLandmarks: Record<string, { lat: number; lon: number; name: string }> = {
-  // Stockholm
-  "gamla stan stockholm": { lat: 59.3251, lon: 18.0719, name: "Gamla Stan" },
-  "globen stockholm": { lat: 59.2932, lon: 18.0837, name: "Globen" },
-  "stadshuset stockholm": { lat: 59.3275, lon: 18.0540, name: "Stockholms Stadshus" },
-  "skansen stockholm": { lat: 59.3264, lon: 18.1031, name: "Skansen" },
+const swedishLandmarks: Record<string, { 
+  lat: number; 
+  lon: number; 
+  name: string;
+  type: 'building' | 'square' | 'house' | 'area';
+  altitude: number;
+  radius: number;
+  speed: number;
+}> = {
+  // Byggnader
+  "turning torso malmö": { 
+    lat: 55.6135, lon: 12.9758, name: "Turning Torso",
+    type: 'building', altitude: 100, radius: 300, speed: 6
+  },
   
-  // Göteborg  
-  "stora kyrkan göteborg": { lat: 57.6489, lon: 11.9746, name: "Domkyrkan" },
-  "liseberg göteborg": { lat: 57.6956, lon: 11.9904, name: "Liseberg" },
-  "göteborgs konstmuseum": { lat: 57.6968, lon: 11.9754, name: "Konstmuseum" },
+  // Torg
+  "stortorget malmö": { 
+    lat: 55.6045, lon: 12.9915, name: "Stortorget",
+    type: 'square', altitude: 50, radius: 150, speed: 5
+  },
   
-  // Malmö
-  "turning torso malmö": { lat: 55.6135, lon: 12.9758, name: "Turning Torso" },
-  "stortorget malmö": { lat: 55.6045, lon: 12.9915, name: "Stortorget" },
-  "malmöhus slott": { lat: 55.6034, lon: 12.9851, name: "Malmöhus" },
+  // Hus
+  "ingefärsgatan 99": {
+    lat: 57.7089, lon: 11.9746, name: "Ingefärsgatan 99", 
+    type: 'house', altitude: 30, radius: 100, speed: 5
+  },
+  
+  // Områden
+  "liseberg göteborg": { 
+    lat: 57.6956, lon: 11.9904, name: "Liseberg",
+    type: 'area', altitude: 80, radius: 400, speed: 8
+  }
 };
   export function ControlsPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDestinationOpen, setIsDestinationOpen] = useState(false);
   const [isAiInspectionOpen, setIsAiInspectionOpen] = useState(false);
   const [destinationQuery, setDestinationQuery] = useState('');
+  const [aiInspectionQuery, setAiInspectionQuery] = useState('');
   const { mode } = useGameMode();
   const { teleportTo, startOrbitMode } = useGameMethod();
-  // const { teleportTo } = useGameMethod(); // Lägg till denna
-  {/* Destination Button */}
-
-  const handleDestinationSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!destinationQuery.trim()) return;
-    const query = destinationQuery.toLowerCase().trim();
+  console.log("startOrbitMode finns:", typeof startOrbitMode);
   
-    // Kolla landmarks först
-    if (swedishLandmarks[query]) {
-      const landmark = swedishLandmarks[query];
-      
-      // Bara vanlig teleport, ingen orbit:
-      teleportTo(landmark.lon, landmark.lat, 1000, 0);
-      
+  
+  
+  // 1. KOMPLETT handleDestinationSearch funktion
+const handleDestinationSearch = async (e: React.FormEvent) => {
+  e.preventDefault();
+  if (!destinationQuery.trim()) return;
+  
+  const query = destinationQuery.toLowerCase().trim();
+
+  // Kolla landmarks först
+  if (swedishLandmarks[query]) {
+    const landmark = swedishLandmarks[query];
+    teleportTo(landmark.lon, landmark.lat, 1000, 0);
+    setIsDestinationOpen(false);
+    setDestinationQuery('');
+    return;
+  }
+
+  // Annars använd geokodning
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinationQuery)}&limit=1`
+    );
+    const data = await response.json();
+    
+    if (data.length > 0) {
+      const { lat, lon } = data[0];
+      teleportTo(parseFloat(lon), parseFloat(lat), 1000, 0);
       setIsDestinationOpen(false);
       setDestinationQuery('');
-      return;
     }
+  } catch (error) {
+    console.error('Geocoding error:', error);
+  }
+};
 
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinationQuery)}&limit=1`
-      );
-      const data = await response.json();
-      
-      if (data.length > 0) {
-        const { lat, lon } = data[0];
-        teleportTo(parseFloat(lon), parseFloat(lat), 1000, 0);
-        setIsDestinationOpen(false);
-        setDestinationQuery('');
-      }
-      } catch (error) {
-        console.error('Geocoding error:', error);
-      }
-    };
+// 2. KOMPLETT handleAiInspection funktion
+const handleAiInspection = async (e: React.FormEvent) => {
+  e.preventDefault();
+  console.log("🤖 AI-funktion startad!");
+  
+  if (!aiInspectionQuery.trim()) {
+    console.log("❌ Tom query!");
+    return;
+  }
+  
+  const query = aiInspectionQuery.toLowerCase().trim();
+  console.log("🔍 Söker efter:", query);
+  console.log("📍 Tillgängliga landmarks:", Object.keys(swedishLandmarks));
+  
+  if (swedishLandmarks[query]) {
+    const landmark = swedishLandmarks[query];
+    console.log("✅ Hittade landmark:", landmark);
+    
+    startOrbitMode(landmark.lon, landmark.lat, 500, 150, 0.02);
+    setIsAiInspectionOpen(false);
+    setAiInspectionQuery('');
+    return;
+  }
+  
+  console.log("❌ Landmark inte hittad för:", query);
+};
 
-    useEffect(() => {
-      const handleKeyPress = (e: KeyboardEvent) => {
-        if (e.key === '?' || (e.shiftKey && e.key === '/')) {
-          e.preventDefault();
-          setIsOpen(prev => !prev);
-        }
-      };
+// 3. useEffect
+useEffect(() => {
+  const handleKeyPress = (e: KeyboardEvent) => {
+    if (e.key === '?' || (e.shiftKey && e.key === '/')) {
+      e.preventDefault();
+      setIsOpen(prev => !prev);
+    }
+  };
 
-      window.addEventListener('keydown', handleKeyPress);
-      return () => window.removeEventListener('keydown', handleKeyPress);
-    }, []);
+  window.addEventListener('keydown', handleKeyPress);
+  return () => window.removeEventListener('keydown', handleKeyPress);
+}, []);
 
   return (
     <>
@@ -154,12 +200,11 @@ const swedishLandmarks: Record<string, { lat: number; lon: number; name: string 
       {isAiInspectionOpen && (
         <div className="fixed bottom-24 left-40 z-50 animate-fade-in">
           <Panel title="AI Granskning" className="min-w-[280px]">
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              // TODO: AI granskning logik här
-            }}>
+            <form onSubmit={handleAiInspection}>  {/* DENNA RAD SKA FINNAS */}
               <input
                 type="text"
+                value={aiInspectionQuery}
+                onChange={(e) => setAiInspectionQuery(e.target.value)}
                 onKeyDown={(e) => e.stopPropagation()}
                 onKeyUp={(e) => e.stopPropagation()}
                 onKeyPress={(e) => e.stopPropagation()}

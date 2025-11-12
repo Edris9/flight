@@ -175,49 +175,52 @@ export class GameBridge extends TypedEventEmitter<GameEvents> {
   }
 
   
-  public startOrbitMode(centerLon: number, centerLat: number, radius: number = 300, altitude: number = 150): void {
-  const vehicle = this.game.getVehicleManager().getActiveVehicle();
-  if (!vehicle) return;
+  public startOrbitMode(centerLon: number, centerLat: number, radius: number = 300, altitude: number = 150, speed: number = 0.02): void {
+    const vehicle = this.game.getVehicleManager().getActiveVehicle();
+    if (!vehicle) return;
 
-  let angle = 0;
-  const radiusInDegrees = 0.002; // ~200m radie
-  const speed = 0.02; // Rotationshastighet
-  
-  const orbitInterval = setInterval(() => {
-    // Beräkna smooth circular position
-    const offsetLon = Math.cos(angle) * radiusInDegrees;
-    const offsetLat = Math.sin(angle) * radiusInDegrees;
+    let angle = 0;
+    const radiusInDegrees = radius / 111000;
     
-    const orbitPosition = Cesium.Cartesian3.fromDegrees(
-      centerLon + offsetLon,
-      centerLat + offsetLat,
-      altitude
-    );
-    
-    const currentState = vehicle.getState();
-    vehicle.setState({
-      ...currentState,
-      position: orbitPosition,
-      velocity: 10, // Konstant hastighet
-      speed: 10,
-      heading: angle + Math.PI/2 // Peka tangentiellt
-    });
-    
-    angle += speed;
-    
-    // Stoppa efter 2 hela varv
-    if (angle >= Math.PI * 4) {
-      clearInterval(orbitInterval);
-      // Stanna helt
-      const finalState = vehicle.getState();
+    const orbitInterval = setInterval(() => {
+      const offsetLon = Math.cos(angle) * radiusInDegrees;
+      const offsetLat = Math.sin(angle) * radiusInDegrees;
+      
+      const orbitPosition = Cesium.Cartesian3.fromDegrees(
+        centerLon + offsetLon,
+        centerLat + offsetLat,
+        altitude
+      );
+      
+      const currentState = vehicle.getState();
       vehicle.setState({
-        ...finalState,
-        velocity: 0,
-        speed: 0
+        ...currentState,
+        position: orbitPosition,
+        velocity: 15,  // Återställ rörelse under orbit
+        speed: 15,     // Återställ hastighet
+        heading: angle + Math.PI/2,
+        pitch: 0,
+        roll: 0
       });
-    }
-  }, 100); // Uppdatera varje 100ms för smooth motion
-}
+      
+      angle += speed;
+      
+      if (angle >= Math.PI * 4) {
+        clearInterval(orbitInterval);
+        
+        // Stopp ENDAST efter orbit är klar:
+        const finalState = vehicle.getState();
+        vehicle.setState({
+          ...finalState,
+          velocity: 0,    // Nu stoppa helt
+          speed: 0,
+          heading: 0,
+          pitch: 0,
+          roll: 0
+        });
+      }
+    }, 100);
+  }
 
   public restart(): void {
     const vehicle = this.game.getVehicleManager().getActiveVehicle();
