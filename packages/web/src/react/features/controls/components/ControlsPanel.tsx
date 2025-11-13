@@ -89,26 +89,75 @@ const handleAiInspection = async (e: React.FormEvent) => {
   e.preventDefault();
   console.log("🤖 AI-funktion startad!");
   
-  if (!aiInspectionQuery.trim()) {
-    console.log("❌ Tom query!");
-    return;
-  }
+  if (!aiInspectionQuery.trim()) return;
   
   const query = aiInspectionQuery.toLowerCase().trim();
-  console.log("🔍 Söker efter:", query);
-  console.log("📍 Tillgängliga landmarks:", Object.keys(swedishLandmarks));
   
+  // Först kolla lokala landmarks
   if (swedishLandmarks[query]) {
     const landmark = swedishLandmarks[query];
-    console.log("✅ Hittade landmark:", landmark);
-    
+    console.log("✅ Hittade i lokala landmarks:", landmark);
     startOrbitMode(landmark.lon, landmark.lat, 500, 150, 0.02);
     setIsAiInspectionOpen(false);
     setAiInspectionQuery('');
     return;
   }
   
-  console.log("❌ Landmark inte hittad för:", query);
+  // Sedan sök i hela Sverige automatiskt
+  try {
+    console.log("🔍 Söker i hela Sverige efter:", query);
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=se&limit=1`
+    );
+    const data = await response.json();
+    
+    if (data.length > 0) {
+  // Försök hitta mest specifik match först
+  let bestMatch = data[0];
+  
+  for (const place of data) {
+    if (place.address && place.address.house_number) {
+      bestMatch = place;
+      break;
+    }
+  }
+  
+  const lat = parseFloat(bestMatch.lat);
+  const lon = parseFloat(bestMatch.lon);
+  
+  // SÄKERHETSVALIDERING:
+  if (isNaN(lat) || isNaN(lon)) {
+    console.log("❌ Ogiltiga koordinater");
+    return;
+  }
+  
+    console.log("✅ Hittade:", bestMatch.display_name);
+    console.log("📍 Koordinater:", lat, lon);
+    
+        // MYCKET SÄKRARE HÖJDER - aldrig under 150m
+    let altitude = Math.max(150, 100); // Minst 150m höjd
+    let radius = 200;
+
+    if (bestMatch.type === 'city' || bestMatch.type === 'town') {
+      altitude = 300;  // Högt över städer
+      radius = 500;
+    }
+    if (bestMatch.class === 'building') {
+      altitude = 200;  // Säkert över byggnader  
+      radius = 150;
+    }
+    if (bestMatch.address && bestMatch.address.house_number) {
+      altitude = 250;  // Extra säker höjd för adresser
+      radius = 300;
+    }
+
+    console.log("🚁 Flyger till säker höjd:", altitude, "radie:", radius);
+    startOrbitMode(lon, lat, radius, altitude, 0.02);
+        // ...
+      }
+  } catch (error) {
+    console.error('Sverige-sökning fel:', error);
+  }
 };
 
 // 3. useEffect
