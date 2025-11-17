@@ -9,6 +9,7 @@ import { Aircraft } from '../vehicles/aircraft/Aircraft';
 import type { Vehicle } from '../vehicles/Vehicle';
 import { ModeManager } from '../modes/ModeManager';
 
+
 export class GameBridge extends TypedEventEmitter<GameEvents> {
   private game: CesiumVehicleGame;
   private updateInterval: number | null = null;
@@ -171,6 +172,54 @@ export class GameBridge extends TypedEventEmitter<GameEvents> {
         altitude
       });
     }
+  }
+
+  
+  public startOrbitMode(centerLon: number, centerLat: number, radius: number = 300, altitude: number = 150, speed: number = 0.02): void {
+    const vehicle = this.game.getVehicleManager().getActiveVehicle();
+    if (!vehicle) return;
+
+    let angle = 0;
+    const radiusInDegrees = radius / 111000;
+    
+    const orbitInterval = setInterval(() => {
+      const offsetLon = Math.cos(angle) * radiusInDegrees;
+      const offsetLat = Math.sin(angle) * radiusInDegrees;
+      
+      const orbitPosition = Cesium.Cartesian3.fromDegrees(
+        centerLon + offsetLon,
+        centerLat + offsetLat,
+        altitude
+      );
+      
+      const currentState = vehicle.getState();
+      vehicle.setState({
+        ...currentState,
+        position: orbitPosition,
+        velocity: 15,  // Återställ rörelse under orbit
+        speed: 15,     // Återställ hastighet
+        heading: angle + Math.PI/2,
+        pitch: 0,
+        roll: 0
+      });
+      
+      angle += speed;
+      
+      if (angle >= Math.PI * 4) {
+        clearInterval(orbitInterval);
+        
+        // Stopp ENDAST efter orbit är klar:
+        const finalState = vehicle.getState();
+        vehicle.setState({
+          ...finalState,
+          velocity: 0,    // Nu stoppa helt
+          speed: 0,
+          heading: 0,
+          pitch: 0,
+          roll: 0
+        });
+      }
+    }, 100);
   }
 
   public restart(): void {

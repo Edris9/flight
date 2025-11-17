@@ -3,12 +3,22 @@ import type { CameraType } from '../../cesium/managers/CameraManager';
 import type { VehicleStateData } from '../../cesium/bridge/types';
 import type { QualityConfig } from '../../cesium/core/Scene';
 
+
 export function useGameMethod() {
   const bridge = useGameBridge();
 
   return {
     switchCamera: () => bridge.switchCamera(),
     getCameraType: (): CameraType => bridge.getCameraType(),
+    // ... alla befintliga funktioner ...
+    teleportTo: (longitude: number, latitude: number, altitude: number, heading?: number) => 
+      bridge.teleportTo(longitude, latitude, altitude, heading),
+    
+    // Lägg till denna nya funktion:
+    startOrbitMode: (centerLon: number, centerLat: number, radius: number = 300, altitude: number = 150, speed: number = 0.02) => 
+      bridge.startOrbitMode(centerLon, centerLat, radius, altitude, speed),
+      
+    restart: () => bridge.restart(),
     toggleRoverMode: () => bridge.toggleRoverMode(),
     toggleVehicleType: () => bridge.toggleVehicleType(),
     getRoverMode: (): boolean => bridge.getRoverMode(),

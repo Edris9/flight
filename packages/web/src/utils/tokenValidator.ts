@@ -32,5 +32,3 @@ export function saveTokens(cesium: string): void {
 export function clearTokens(): void {
   localStorage.removeItem(CESIUM_TOKEN_KEY);
 }
-
-

@@ -4,6 +4,7 @@ import { useVehiclePosition } from '../hooks/useVehiclePosition';
 import { useGameMethod } from '../../../hooks/useGameMethod';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+
 interface SearchResult {
   id: string;
   place_name: string;
@@ -51,10 +52,10 @@ export function MiniMap() {
   }, [isSearchOpen]);
 
   const fetchSearchResults = useCallback(async (query: string) => {
-    if (query.length < 3) {
-      setSearchResults([]);
-      return;
-    }
+  if (query.length < 3) {
+    setSearchResults([]);
+    return;
+  }
 
     setIsSearching(true);
     try {
