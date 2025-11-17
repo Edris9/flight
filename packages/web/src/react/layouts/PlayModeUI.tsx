@@ -3,6 +3,7 @@ import { ControlsPanel } from '../features/controls/components/ControlsPanel';
 import { CameraControls } from '../features/camera/components/CameraControls';
 import { CrashScreen } from '../features/crash/components/CrashScreen';
 import { MiniMap } from '../features/minimap/components/MiniMap';
+import { VoiceControl } from '../features/voice/components/VoiceControl';
 
 export function PlayModeUI() {
   return (
@@ -13,6 +14,7 @@ export function PlayModeUI() {
       </div>
       <HUD />
       <MiniMap />
+      <VoiceControl />
       <CrashScreen />
     </>
   );

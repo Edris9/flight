@@ -59,16 +59,25 @@ export function MiniMap() {
 
     setIsSearching(true);
     try {
+      // Using Nominatim (OpenStreetMap) - free geocoding service
       const response = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5`
+        `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&limit=5&addressdetails=1`,
+        {
+          headers: {
+            'User-Agent': 'Flight-Simulator-App'
+          }
+        }
       );
       const data = await response.json();
-      const features = data.map((item: any) => ({
-        id: item.place_id,
+
+      // Convert Nominatim format to our SearchResult format
+      const results: SearchResult[] = data.map((item: any) => ({
+        id: item.place_id.toString(),
         place_name: item.display_name,
         center: [parseFloat(item.lon), parseFloat(item.lat)]
       }));
-      setSearchResults(features);
+
+      setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);
       setSearchResults([]);
@@ -247,7 +256,6 @@ export function MiniMap() {
             {/* Map */}
             <Map
               ref={mapRef}
-              
               initialViewState={{
                 longitude: position.longitude,
                 latitude: position.latitude,
@@ -261,24 +269,7 @@ export function MiniMap() {
                 bearing: mapBearing,
               })}
               style={{ width: '100%', height: '100%' }}
-              mapStyle={{
-                "version": 8,
-                "sources": {
-                  "osm": {
-                    "type": "raster",
-                    "tiles": ["https://tile.openstreetmap.org/{z}/{x}/{y}.png"],
-                    "tileSize": 256
-                  }
-                },
-                "layers": [
-                  {
-                    "id": "osm",
-                    "type": "raster",
-                    "source": "osm"
-                  }
-                ]
-              }}
-          
+              mapStyle="https://tiles.openfreemap.org/styles/liberty"
               attributionControl={false}
               dragPan={isExpanded}
               scrollZoom={isExpanded}
