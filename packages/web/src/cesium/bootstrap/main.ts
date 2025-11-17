@@ -11,6 +11,9 @@ import { VoiceInputManager } from '../input/VoiceInputManager';
 import { LocationService } from '../services/LocationService';
 import { MarkerManager } from '../services/MarkerManager';
 import { OrbitMode } from '../modes/OrbitMode';
+import { NavigationService } from '../services/NavigationService';
+import { CommandQueueService } from '../services/CommandQueueService';
+import { VoiceCommandParser } from '../services/VoiceCommandParser';
 
 export class CesiumVehicleGame {
   private scene: Scene;
@@ -25,6 +28,9 @@ export class CesiumVehicleGame {
   private locationService: LocationService;
   private markerManager: MarkerManager;
   private orbitMode: OrbitMode;
+  private navigationService: NavigationService;
+  private commandQueueService: CommandQueueService;
+  private voiceCommandParser: VoiceCommandParser;
 
   constructor(containerId: string = "cesiumContainer") {
     this.scene = new Scene(containerId);
@@ -36,6 +42,14 @@ export class CesiumVehicleGame {
     this.locationService = new LocationService();
     this.markerManager = new MarkerManager(this.scene.viewer);
     this.orbitMode = new OrbitMode();
+    this.navigationService = new NavigationService();
+    this.voiceCommandParser = new VoiceCommandParser();
+    this.commandQueueService = new CommandQueueService(
+      this.navigationService,
+      this.locationService,
+      this.markerManager,
+      this.orbitMode
+    );
     this.objectManager = new ObjectManager(this.scene.viewer);
     this.placementController = new PlacementController(this.scene.viewer, this.objectManager);
 
@@ -52,17 +66,46 @@ export class CesiumVehicleGame {
       update: (deltaTime: number) => {
         this.placementController.update(deltaTime);
         this.orbitMode.update(deltaTime);
+        this.navigationService.update(deltaTime);
+        this.commandQueueService.update(deltaTime);
       }
     });
 
     this.vehicleManager.onVehicleChange((vehicle) => {
       this.cameraManager.setTarget(vehicle);
+
+      // Set vehicle reference for AI navigation
+      this.navigationService.setDrone(vehicle as any);
+      this.commandQueueService.setDrone(vehicle as any);
+
       console.log('📷 Camera target updated to new vehicle');
+      console.log('🤖 AI navigation services connected to vehicle');
     });
   }
 
   private setupVoiceControls(): void {
-    // Register location handler for "flyga till [plats]"
+    // Register COMPLEX COMMAND handler for multi-step AI navigation
+    // Example: "Flyg till Stockholm med fort hastighet och granska området i 3 minuter sen flyg till Göteborg"
+    this.voiceInputManager.setComplexCommandCallback(async (transcript: string) => {
+      console.log('🤖 AI Navigation: Processing complex command');
+
+      try {
+        // Parse the command into structured steps
+        const parsed = this.voiceCommandParser.parse(transcript);
+
+        console.log(`📋 Parsed ${parsed.commands.length} command(s):`);
+        parsed.commands.forEach((cmd, i) => {
+          console.log(`   ${i + 1}. ${cmd.type} ${cmd.location || ''}`);
+        });
+
+        // Add commands to execution queue
+        await this.commandQueueService.addCommands(parsed.commands);
+      } catch (error) {
+        console.error('❌ Failed to process complex command:', error);
+      }
+    });
+
+    // Register location handler for "flyga till [plats]" (simple single-step commands)
     this.voiceInputManager.setLocationCallback(async (location: string) => {
       console.log(`🗺️ Voice command: Fly to ${location}`);
       console.log(`📍 Searching for location: "${location}"`);
@@ -234,6 +277,18 @@ export class CesiumVehicleGame {
     return this.orbitMode;
   }
 
+  public getNavigationService(): NavigationService {
+    return this.navigationService;
+  }
+
+  public getCommandQueueService(): CommandQueueService {
+    return this.commandQueueService;
+  }
+
+  public getVoiceCommandParser(): VoiceCommandParser {
+    return this.voiceCommandParser;
+  }
+
   public destroy(): void {
     this.stop();
     this.scene.stopEarthSpin();
@@ -245,6 +300,8 @@ export class CesiumVehicleGame {
     this.orbitMode.stopOrbit();
     this.markerManager.clearAllMarkers();
     this.locationService.clearCache();
+    this.navigationService.stopNavigation();
+    this.commandQueueService.clearQueue();
   }
 }
 

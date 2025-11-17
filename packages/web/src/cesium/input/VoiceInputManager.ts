@@ -16,6 +16,7 @@ export interface VoiceCommand {
 
 export type LocationCallback = (location: string) => Promise<void>;
 export type LocationStatusCallback = (status: 'searching' | 'found' | 'error', message?: string) => void;
+export type ComplexCommandCallback = (transcript: string) => Promise<void>;
 
 export class VoiceInputManager {
   private recognition: SpeechRecognition | null = null;
@@ -26,6 +27,7 @@ export class VoiceInputManager {
   private onStatusChange?: (listening: boolean, transcript?: string) => void;
   private onLocationRequest?: LocationCallback;
   private onLocationStatus?: LocationStatusCallback;
+  private onComplexCommand?: ComplexCommandCallback;
   private lastTranscript = '';
   private restartTimeout: number | null = null;
 
@@ -269,10 +271,36 @@ export class VoiceInputManager {
     return locationWords.some(word => transcript.includes(word));
   }
 
+  private isComplexCommand(transcript: string): boolean {
+    // Complex commands contain navigation + multi-step indicators
+    // Examples: "flyg till X och granska", "flyg till X sen flyg till Y"
+    const hasNavigation = this.isLocationCommand(transcript);
+    const hasMultiStep = transcript.includes('och') ||
+                         transcript.includes('sen') ||
+                         transcript.includes('sedan') ||
+                         transcript.includes('granska') ||
+                         transcript.includes('scanna') ||
+                         transcript.includes('vänta');
+
+    return hasNavigation && hasMultiStep;
+  }
+
   private processCommand(transcript: string): void {
     console.log('🎤 Processing command:', transcript);
 
-    // Check for location commands FIRST - before other commands
+    // Check for COMPLEX MULTI-STEP commands FIRST
+    // These contain navigation with modifiers like "och" (and) or "sen" (then)
+    if (this.isComplexCommand(transcript)) {
+      console.log('🤖 Detected complex multi-step command');
+      if (this.onComplexCommand) {
+        this.onComplexCommand(transcript);
+        return;
+      } else {
+        console.warn('⚠️ No complex command handler registered');
+      }
+    }
+
+    // Check for location commands - before other commands
     if (this.isLocationCommand(transcript)) {
       console.log('🗺️ Detected location command, routing to handleLocationCommand');
       this.handleLocationCommand(transcript);
@@ -326,6 +354,10 @@ export class VoiceInputManager {
 
   public setLocationStatusCallback(callback: LocationStatusCallback): void {
     this.onLocationStatus = callback;
+  }
+
+  public setComplexCommandCallback(callback: ComplexCommandCallback): void {
+    this.onComplexCommand = callback;
   }
 
   public start(): void {
