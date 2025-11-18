@@ -359,5 +359,18 @@ export class GameBridge extends TypedEventEmitter<GameEvents> {
   public setVoiceStatusCallback(callback: (listening: boolean, transcript?: string) => void): void {
     this.game.getVoiceInputManager().setStatusChangeCallback(callback);
   }
+
+  public navigateToAddress(longitude: number, latitude: number, altitude: number, name: string, speed?: 'slow' | 'medium' | 'fast' | 'very_fast'): void {
+    const navigationService = this.game.getNavigationService();
+    const targetPosition = Cesium.Cartesian3.fromDegrees(longitude, latitude, altitude);
+
+    navigationService.navigateTo({
+      position: targetPosition,
+      name: name,
+      speed: speed || 'medium'
+    });
+
+    console.log(`🚁 Navigating to ${name} using WASD controls`);
+  }
 }
 

@@ -41,6 +41,8 @@ export function useGameMethod() {
     isVoiceControlActive: () => bridge.isVoiceControlActive(),
     setVoiceStatusCallback: (callback: (listening: boolean, transcript?: string) => void) =>
       bridge.setVoiceStatusCallback(callback),
+    navigateToAddress: (longitude: number, latitude: number, altitude: number, name: string, speed?: 'slow' | 'medium' | 'fast' | 'very_fast') =>
+      bridge.navigateToAddress(longitude, latitude, altitude, name, speed),
   };
 }
 

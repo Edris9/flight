@@ -5,47 +5,69 @@ import { VEHICLE_CONTROLS, CAMERA_CONTROLS, MODE_CONTROLS, BUILDER_CONTROLS } fr
 import { useGameMode } from '../../../hooks/useGameMode';
 import { useGameMethod } from '../../../hooks/useGameMethod';
 
-const swedishLandmarks: Record<string, { 
-  lat: number; 
-  lon: number; 
+// Göteborg landmarks - drönaren känner till alla platser i Göteborg
+const swedishLandmarks: Record<string, {
+  lat: number;
+  lon: number;
   name: string;
-  type: 'building' | 'square' | 'house' | 'area';
+  type: 'building' | 'square' | 'house' | 'area' | 'street';
   altitude: number;
   radius: number;
   speed: number;
 }> = {
-  // Byggnader
-  "turning torso malmö": { 
-    lat: 55.6135, lon: 12.9758, name: "Turning Torso",
-    type: 'building', altitude: 100, radius: 300, speed: 6
-  },
-  
-  // Torg
-  "stortorget malmö": { 
-    lat: 55.6045, lon: 12.9915, name: "Stortorget",
+  // Byggnader i Göteborg
+  "götaplatsen": {
+    lat: 57.6969, lon: 11.9865, name: "Götaplatsen",
     type: 'square', altitude: 50, radius: 150, speed: 5
   },
-  
-  // Hus
-  "ingefärsgatan 99": {
-    lat: 57.7089, lon: 11.9746, name: "Ingefärsgatan 99", 
-    type: 'house', altitude: 30, radius: 100, speed: 5
-  },
-  
-  // Områden
-  "liseberg göteborg": { 
+  "liseberg": {
     lat: 57.6956, lon: 11.9904, name: "Liseberg",
     type: 'area', altitude: 80, radius: 400, speed: 8
+  },
+  "ullevi": {
+    lat: 57.7069, lon: 11.9877, name: "Ullevi",
+    type: 'building', altitude: 60, radius: 200, speed: 6
+  },
+  "scandinavium": {
+    lat: 57.7008, lon: 11.9909, name: "Scandinavium",
+    type: 'building', altitude: 50, radius: 150, speed: 5
+  },
+  "avenyn": {
+    lat: 57.6996, lon: 11.9864, name: "Avenyn (Kungsportsavenyn)",
+    type: 'street', altitude: 40, radius: 200, speed: 5
+  },
+  "haga": {
+    lat: 57.6988, lon: 11.9536, name: "Haga",
+    type: 'area', altitude: 50, radius: 250, speed: 6
+  },
+  "nordstan": {
+    lat: 57.7084, lon: 11.9686, name: "Nordstan",
+    type: 'building', altitude: 50, radius: 150, speed: 5
+  },
+  "ingefärsgatan 99": {
+    lat: 57.7089, lon: 11.9746, name: "Ingefärsgatan 99",
+    type: 'house', altitude: 30, radius: 100, speed: 5
+  },
+  "centralstationen": {
+    lat: 57.7089, lon: 11.9726, name: "Göteborg Centralstation",
+    type: 'building', altitude: 50, radius: 150, speed: 5
+  },
+  "slottsskogen": {
+    lat: 57.6848, lon: 11.9398, name: "Slottsskogen",
+    type: 'area', altitude: 60, radius: 300, speed: 7
   }
 };
   export function ControlsPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDestinationOpen, setIsDestinationOpen] = useState(false);
   const [isAiInspectionOpen, setIsAiInspectionOpen] = useState(false);
+  const [isVoiceOpen, setIsVoiceOpen] = useState(false);
   const [destinationQuery, setDestinationQuery] = useState('');
   const [aiInspectionQuery, setAiInspectionQuery] = useState('');
+  const [isListening, setIsListening] = useState(false);
+  const [voiceTranscript, setVoiceTranscript] = useState('');
   const { mode } = useGameMode();
-  const { teleportTo, startOrbitMode } = useGameMethod();
+  const { teleportTo, startOrbitMode, navigateToAddress, toggleVoiceControl, isVoiceControlActive, setVoiceStatusCallback } = useGameMethod();
   console.log("startOrbitMode finns:", typeof startOrbitMode);
   
   
@@ -103,11 +125,11 @@ const handleAiInspection = async (e: React.FormEvent) => {
     return;
   }
   
-  // Sedan sök i hela Sverige automatiskt
+  // Sedan sök endast i Göteborg
   try {
-    console.log("🔍 Söker i hela Sverige efter:", query);
+    console.log("🔍 Söker i Göteborg efter:", query);
     const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=se&limit=1`
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ', Göteborg, Sweden')}&limit=1`
     );
     const data = await response.json();
     
@@ -160,7 +182,56 @@ const handleAiInspection = async (e: React.FormEvent) => {
   }
 };
 
-// 3. useEffect
+// 3. Voice command handler
+const handleVoiceCommand = async (address: string) => {
+  const query = address.toLowerCase().trim();
+
+  // Sök i Göteborg landmarks
+  if (swedishLandmarks[query]) {
+    const landmark = swedishLandmarks[query];
+    console.log(`🚁 Navigerar till ${landmark.name} med WASD`);
+    navigateToAddress(landmark.lon, landmark.lat, landmark.altitude, landmark.name, 'medium');
+    setVoiceTranscript(`Flyger till ${landmark.name}`);
+    return;
+  }
+
+  // Annars sök med OpenStreetMap (begränsat till Göteborg)
+  try {
+    const response = await fetch(
+      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address + ', Göteborg, Sweden')}&limit=1`
+    );
+    const data = await response.json();
+
+    if (data.length > 0) {
+      const { lat, lon, display_name } = data[0];
+      console.log(`🚁 Navigerar till ${display_name} med WASD`);
+      navigateToAddress(parseFloat(lon), parseFloat(lat), 100, display_name, 'medium');
+      setVoiceTranscript(`Flyger till ${display_name}`);
+    } else {
+      setVoiceTranscript(`Kunde inte hitta: ${address}`);
+    }
+  } catch (error) {
+    console.error('Geocoding error:', error);
+    setVoiceTranscript('Ett fel uppstod vid sökning');
+  }
+};
+
+// 4. useEffect - Voice status callback
+useEffect(() => {
+  setVoiceStatusCallback((listening: boolean, transcript?: string) => {
+    setIsListening(listening);
+    if (transcript) {
+      setVoiceTranscript(transcript);
+      // Parse transcript för adress
+      const addressMatch = transcript.match(/(?:flyga?|navigera?|åk) (?:till|mot) (.+)/i);
+      if (addressMatch) {
+        handleVoiceCommand(addressMatch[1]);
+      }
+    }
+  });
+}, [setVoiceStatusCallback]);
+
+// 5. useEffect - Keyboard shortcuts
 useEffect(() => {
   const handleKeyPress = (e: KeyboardEvent) => {
     if (e.key === '?' || (e.shiftKey && e.key === '/')) {
@@ -211,6 +282,17 @@ useEffect(() => {
         <span className="group-hover:scale-110 transition-transform">🤖</span>
       </button>
 
+      {/* Voice Command Button - Call 211 */}
+      <button
+        onClick={() => setIsVoiceOpen(!isVoiceOpen)}
+        className="fixed bottom-8 left-56 z-50 w-12 h-12 flex items-center justify-center
+                  glass-panel hover:bg-white/10 transition-all duration-300
+                  text-white/60 hover:text-white text-lg group"
+        title="Call 211 - Voice Command"
+      >
+        <span className="group-hover:scale-110 transition-transform">🎙️</span>
+      </button>
+
 
 
 
@@ -258,19 +340,52 @@ useEffect(() => {
                 onKeyUp={(e) => e.stopPropagation()}
                 onKeyPress={(e) => e.stopPropagation()}
                 placeholder="Område att granska..."
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg 
+                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg
                           text-white placeholder:text-white/30
                           focus:outline-none focus:border-green-400/50"
                 autoFocus
               />
               <button
                 type="submit"
-                className="w-full mt-2 px-4 py-2 bg-green-500 hover:bg-green-600 
+                className="w-full mt-2 px-4 py-2 bg-green-500 hover:bg-green-600
                           text-white rounded-lg transition-colors"
               >
                 Starta AI Granskning
               </button>
             </form>
+          </Panel>
+        </div>
+      )}
+
+      {/* Voice Command Panel */}
+      {isVoiceOpen && (
+        <div className="fixed bottom-24 left-56 z-50 animate-fade-in">
+          <Panel title="Call 211 - Voice Command" className="min-w-[300px]">
+            <div className="space-y-4">
+              <div className="text-sm text-white/70">
+                "Vilken adress vill du att operatör flyga till?"
+              </div>
+
+              <button
+                onClick={() => {
+                  toggleVoiceControl();
+                  setIsListening(isVoiceControlActive());
+                }}
+                className={`w-full px-4 py-3 rounded-lg transition-colors ${
+                  isListening
+                    ? 'bg-red-500 hover:bg-red-600 text-white'
+                    : 'bg-blue-500 hover:bg-blue-600 text-white'
+                }`}
+              >
+                {isListening ? '🎤 Lyssnar...' : '🎙️ Tryck för att prata'}
+              </button>
+
+              {voiceTranscript && (
+                <div className="p-3 bg-white/10 rounded-lg text-sm text-white">
+                  "{voiceTranscript}"
+                </div>
+              )}
+            </div>
           </Panel>
         </div>
       )}

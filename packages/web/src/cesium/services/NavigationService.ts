@@ -59,7 +59,7 @@ export class NavigationService {
     this.notifyStatusChange();
   }
 
-  public update(deltaTime: number): void {
+  public update(_deltaTime: number): void {
     if (!this.isNavigating || !this.currentTarget || !this.drone) {
       return;
     }
