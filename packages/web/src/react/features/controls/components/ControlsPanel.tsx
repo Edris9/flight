@@ -18,43 +18,43 @@ const swedishLandmarks: Record<string, {
   // Byggnader i Göteborg
   "götaplatsen": {
     lat: 57.6969, lon: 11.9865, name: "Götaplatsen",
-    type: 'square', altitude: 50, radius: 150, speed: 5
+    type: 'square', altitude: 150, radius: 200, speed: 5
   },
   "liseberg": {
     lat: 57.6956, lon: 11.9904, name: "Liseberg",
-    type: 'area', altitude: 80, radius: 400, speed: 8
+    type: 'area', altitude: 200, radius: 300, speed: 8
   },
   "ullevi": {
     lat: 57.7069, lon: 11.9877, name: "Ullevi",
-    type: 'building', altitude: 60, radius: 200, speed: 6
+    type: 'building', altitude: 150, radius: 250, speed: 6
   },
   "scandinavium": {
     lat: 57.7008, lon: 11.9909, name: "Scandinavium",
-    type: 'building', altitude: 50, radius: 150, speed: 5
+    type: 'building', altitude: 150, radius: 200, speed: 5
   },
   "avenyn": {
     lat: 57.6996, lon: 11.9864, name: "Avenyn (Kungsportsavenyn)",
-    type: 'street', altitude: 40, radius: 200, speed: 5
+    type: 'street', altitude: 120, radius: 250, speed: 5
   },
   "haga": {
     lat: 57.6988, lon: 11.9536, name: "Haga",
-    type: 'area', altitude: 50, radius: 250, speed: 6
+    type: 'area', altitude: 150, radius: 250, speed: 6
   },
   "nordstan": {
     lat: 57.7084, lon: 11.9686, name: "Nordstan",
-    type: 'building', altitude: 50, radius: 150, speed: 5
+    type: 'building', altitude: 150, radius: 200, speed: 5
   },
   "ingefärsgatan 99": {
     lat: 57.7089, lon: 11.9746, name: "Ingefärsgatan 99",
-    type: 'house', altitude: 30, radius: 100, speed: 5
+    type: 'house', altitude: 120, radius: 150, speed: 5
   },
   "centralstationen": {
     lat: 57.7089, lon: 11.9726, name: "Göteborg Centralstation",
-    type: 'building', altitude: 50, radius: 150, speed: 5
+    type: 'building', altitude: 150, radius: 200, speed: 5
   },
   "slottsskogen": {
     lat: 57.6848, lon: 11.9398, name: "Slottsskogen",
-    type: 'area', altitude: 60, radius: 300, speed: 7
+    type: 'area', altitude: 180, radius: 300, speed: 7
   }
 };
   export function ControlsPanel() {
@@ -182,15 +182,22 @@ const handleAiInspection = async (e: React.FormEvent) => {
   }
 };
 
-// 3. Voice command handler
+// 3. Voice command handler - använder orbit istället för WASD
 const handleVoiceCommand = async (address: string) => {
   const query = address.toLowerCase().trim();
 
   // Sök i Göteborg landmarks
   if (swedishLandmarks[query]) {
     const landmark = swedishLandmarks[query];
-    console.log(`🚁 Navigerar till ${landmark.name} med WASD`);
-    navigateToAddress(landmark.lon, landmark.lat, landmark.altitude, landmark.name, 'medium');
+    console.log(`🚁 Flyger till ${landmark.name} och cirkulerar`);
+    // Använd orbit mode - cirkulerar runt platsen
+    startOrbitMode(
+      landmark.lon,
+      landmark.lat,
+      landmark.radius,    // Använd radius från landmark
+      landmark.altitude,  // Använd altitude från landmark
+      0.01  // Långsammare hastighet för att se drönaren bättre
+    );
     setVoiceTranscript(`Flyger till ${landmark.name}`);
     return;
   }
@@ -204,8 +211,15 @@ const handleVoiceCommand = async (address: string) => {
 
     if (data.length > 0) {
       const { lat, lon, display_name } = data[0];
-      console.log(`🚁 Navigerar till ${display_name} med WASD`);
-      navigateToAddress(parseFloat(lon), parseFloat(lat), 100, display_name, 'medium');
+      console.log(`🚁 Flyger till ${display_name} och cirkulerar`);
+      // Använd orbit mode med standard värden
+      startOrbitMode(
+        parseFloat(lon),
+        parseFloat(lat),
+        200,  // 200m radius
+        150,  // 150m höjd
+        0.01  // Långsammare hastighet
+      );
       setVoiceTranscript(`Flyger till ${display_name}`);
     } else {
       setVoiceTranscript(`Kunde inte hitta: ${address}`);
