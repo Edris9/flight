@@ -2,7 +2,7 @@ import { useGameBridge } from './useGameBridge';
 import type { CameraType } from '../../cesium/managers/CameraManager';
 import type { VehicleStateData } from '../../cesium/bridge/types';
 import type { QualityConfig } from '../../cesium/core/Scene';
-
+import type { MissionAction } from '../../cesium/bridge/GameBridge'; // Importera typen
 
 export function useGameMethod() {
   const bridge = useGameBridge();
@@ -10,14 +10,14 @@ export function useGameMethod() {
   return {
     switchCamera: () => bridge.switchCamera(),
     getCameraType: (): CameraType => bridge.getCameraType(),
-    // ... alla befintliga funktioner ...
-    teleportTo: (longitude: number, latitude: number, altitude: number, heading?: number) => 
-      bridge.teleportTo(longitude, latitude, altitude, heading),
-    
-    // Lägg till denna nya funktion:
+    teleportTo: (longitude: number, latitude: number, altitude: number, heading?: number, fly?: boolean, shouldOrbit?: boolean) => 
+      bridge.teleportTo(longitude, latitude, altitude, heading, fly, shouldOrbit),
     startOrbitMode: (centerLon: number, centerLat: number, radius: number = 300, altitude: number = 150, speed: number = 0.02) => 
       bridge.startOrbitMode(centerLon, centerLat, radius, altitude, speed),
-      
+    
+    // NY FUNKTION
+    executeMission: (actions: MissionAction[]) => bridge.executeMission(actions),
+
     restart: () => bridge.restart(),
     toggleRoverMode: () => bridge.toggleRoverMode(),
     toggleVehicleType: () => bridge.toggleVehicleType(),
@@ -34,5 +34,3 @@ export function useGameMethod() {
     setThrottle: (percent: number) => bridge.setThrottle(percent),
   };
 }
-
-

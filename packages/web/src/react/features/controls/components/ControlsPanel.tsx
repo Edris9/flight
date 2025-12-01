@@ -1,346 +1,163 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Panel } from '../../../shared/components/Panel';
 import { ControlButton } from './ControlButton';
 import { VEHICLE_CONTROLS, CAMERA_CONTROLS, MODE_CONTROLS, BUILDER_CONTROLS } from '../constants';
 import { useGameMode } from '../../../hooks/useGameMode';
 import { useGameMethod } from '../../../hooks/useGameMethod';
+import type { MissionAction } from '../../../../cesium/bridge/GameBridge';
 
-const swedishLandmarks: Record<string, { 
-  lat: number; 
-  lon: number; 
-  name: string;
-  type: 'building' | 'square' | 'house' | 'area';
-  altitude: number;
-  radius: number;
-  speed: number;
-}> = {
-  // Byggnader
-  "turning torso malmö": { 
-    lat: 55.6135, lon: 12.9758, name: "Turning Torso",
-    type: 'building', altitude: 100, radius: 300, speed: 6
-  },
-  
-  // Torg
-  "stortorget malmö": { 
-    lat: 55.6045, lon: 12.9915, name: "Stortorget",
-    type: 'square', altitude: 50, radius: 150, speed: 5
-  },
-  
-  // Hus
-  "ingefärsgatan 99": {
-    lat: 57.7089, lon: 11.9746, name: "Ingefärsgatan 99", 
-    type: 'house', altitude: 30, radius: 100, speed: 5
-  },
-  
-  // Områden
-  "liseberg göteborg": { 
-    lat: 57.6956, lon: 11.9904, name: "Liseberg",
-    type: 'area', altitude: 80, radius: 400, speed: 8
-  }
+// 👇 DIN NYCKEL
+const OPENAI_KEY = import.meta.env.VITE_OPENAI_API_KEY;
+
+const swedishLandmarks: Record<string, { lat: number; lon: number; name: string; type: 'building' | 'square' | 'house' | 'area'; altitude: number; radius: number; speed: number; }> = {
+  "turning torso malmö": { lat: 55.6135, lon: 12.9758, name: "Turning Torso", type: 'building', altitude: 100, radius: 300, speed: 6 },
+  "stortorget malmö": { lat: 55.6045, lon: 12.9915, name: "Stortorget", type: 'square', altitude: 50, radius: 150, speed: 5 },
+  "liseberg göteborg": { lat: 57.6956, lon: 11.9904, name: "Liseberg", type: 'area', altitude: 80, radius: 400, speed: 8 },
+  "kungälv": { lat: 57.8739, lon: 11.9722, name: "Kungälv", type: 'area', altitude: 150, radius: 400, speed: 8 },
 };
-  export function ControlsPanel() {
+
+async function geocodeLocation(locationName: string | undefined) {
+  if (!locationName || typeof locationName !== 'string') return null;
+  const query = locationName.toLowerCase().trim();
+  if (swedishLandmarks[query]) return swedishLandmarks[query];
+  try {
+    const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(query)}&limit=1`);
+    const data = await res.json();
+    if (data.features && data.features.length > 0) {
+      const coords = data.features[0].geometry.coordinates;
+      return { lon: coords[0], lat: coords[1], name: data.features[0].properties.name };
+    }
+  } catch (e) { console.error("Geocode failed", e); }
+  return null;
+}
+
+export function ControlsPanel() {
   const [isOpen, setIsOpen] = useState(false);
   const [isDestinationOpen, setIsDestinationOpen] = useState(false);
   const [isAiInspectionOpen, setIsAiInspectionOpen] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [voiceText, setVoiceText] = useState(''); 
+  const recognitionRef = useRef<any>(null); 
   const [destinationQuery, setDestinationQuery] = useState('');
   const [aiInspectionQuery, setAiInspectionQuery] = useState('');
   const { mode } = useGameMode();
-  const { teleportTo, startOrbitMode } = useGameMethod();
-  console.log("startOrbitMode finns:", typeof startOrbitMode);
-  
-  
-  
-  // 1. KOMPLETT handleDestinationSearch funktion
-const handleDestinationSearch = async (e: React.FormEvent) => {
-  e.preventDefault();
-  if (!destinationQuery.trim()) return;
-  
-  const query = destinationQuery.toLowerCase().trim();
+  const { teleportTo, startOrbitMode, executeMission } = useGameMethod();
 
-  // Kolla landmarks först
-  if (swedishLandmarks[query]) {
-    const landmark = swedishLandmarks[query];
-    teleportTo(landmark.lon, landmark.lat, 1000, 0);
-    setIsDestinationOpen(false);
-    setDestinationQuery('');
-    return;
-  }
-
-  // Annars använd geokodning
-  try {
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinationQuery)}&limit=1`
-    );
-    const data = await response.json();
-    
-    if (data.length > 0) {
-      const { lat, lon } = data[0];
-      teleportTo(parseFloat(lon), parseFloat(lat), 1000, 0);
-      setIsDestinationOpen(false);
-      setDestinationQuery('');
-    }
-  } catch (error) {
-    console.error('Geocoding error:', error);
-  }
-};
-
-// 2. KOMPLETT handleAiInspection funktion
-const handleAiInspection = async (e: React.FormEvent) => {
-  e.preventDefault();
-  console.log("🤖 AI-funktion startad!");
-  
-  if (!aiInspectionQuery.trim()) return;
-  
-  const query = aiInspectionQuery.toLowerCase().trim();
-  
-  // Först kolla lokala landmarks
-  if (swedishLandmarks[query]) {
-    const landmark = swedishLandmarks[query];
-    console.log("✅ Hittade i lokala landmarks:", landmark);
-    startOrbitMode(landmark.lon, landmark.lat, 500, 150, 0.02);
-    setIsAiInspectionOpen(false);
-    setAiInspectionQuery('');
-    return;
-  }
-  
-  // Sedan sök i hela Sverige automatiskt
-  try {
-    console.log("🔍 Söker i hela Sverige efter:", query);
-    const response = await fetch(
-      `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query)}&countrycodes=se&limit=1`
-    );
-    const data = await response.json();
-    
-    if (data.length > 0) {
-  // Försök hitta mest specifik match först
-  let bestMatch = data[0];
-  
-  for (const place of data) {
-    if (place.address && place.address.house_number) {
-      bestMatch = place;
-      break;
-    }
-  }
-  
-  const lat = parseFloat(bestMatch.lat);
-  const lon = parseFloat(bestMatch.lon);
-  
-  // SÄKERHETSVALIDERING:
-  if (isNaN(lat) || isNaN(lon)) {
-    console.log("❌ Ogiltiga koordinater");
-    return;
-  }
-  
-    console.log("✅ Hittade:", bestMatch.display_name);
-    console.log("📍 Koordinater:", lat, lon);
-    
-        // MYCKET SÄKRARE HÖJDER - aldrig under 150m
-    let altitude = Math.max(150, 100); // Minst 150m höjd
-    let radius = 200;
-
-    if (bestMatch.type === 'city' || bestMatch.type === 'town') {
-      altitude = 300;  // Högt över städer
-      radius = 500;
-    }
-    if (bestMatch.class === 'building') {
-      altitude = 200;  // Säkert över byggnader  
-      radius = 150;
-    }
-    if (bestMatch.address && bestMatch.address.house_number) {
-      altitude = 250;  // Extra säker höjd för adresser
-      radius = 300;
-    }
-
-    console.log("🚁 Flyger till säker höjd:", altitude, "radie:", radius);
-    startOrbitMode(lon, lat, radius, altitude, 0.02);
-        // ...
-      }
-  } catch (error) {
-    console.error('Sverige-sökning fel:', error);
-  }
-};
-
-// 3. useEffect
-useEffect(() => {
-  const handleKeyPress = (e: KeyboardEvent) => {
-    if (e.key === '?' || (e.shiftKey && e.key === '/')) {
-      e.preventDefault();
-      setIsOpen(prev => !prev);
+  const toggleVoiceRecording = () => {
+    if (isRecording) {
+      if (recognitionRef.current) { recognitionRef.current.stop(); recognitionRef.current = null; }
+      setIsRecording(false);
+      if (voiceText.trim().length > 0) processVoiceText(voiceText);
+      setVoiceText(''); 
+    } else {
+      const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+      if (!SpeechRecognition) { alert("Ingen mikrofonstöd."); return; }
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'sv-SE'; recognition.continuous = true; recognition.interimResults = true; 
+      recognition.onresult = (event: any) => {
+        let finalScript = '';
+        for (let i = 0; i < event.results.length; i++) finalScript += event.results[i][0].transcript;
+        setVoiceText(finalScript);
+      };
+      recognition.start();
+      recognitionRef.current = recognition;
+      setIsRecording(true);
+      setVoiceText(''); 
     }
   };
 
-  window.addEventListener('keydown', handleKeyPress);
-  return () => window.removeEventListener('keydown', handleKeyPress);
-}, []);
+  // --- NY RENSA-FUNKTION ---
+  const clearVoice = () => {
+    if (recognitionRef.current) {
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
+    }
+    setIsRecording(false);
+    setVoiceText(''); // Töm texten
+  };
+
+  const processVoiceText = async (text: string) => {
+    console.log("🧠 AI Processing:", text);
+    if (!OPENAI_KEY || OPENAI_KEY.includes("YOUR_OPENAI_KEY")) { alert("Ingen API-nyckel!"); return; }
+
+    const tools = [{ type: "function", function: { name: "plan_mission", description: "Planera flygning.", parameters: { type: "object", properties: { steps: { type: "array", items: { type: "object", properties: { action: { type: "string", enum: ["fly", "inspect", "wait"] }, location: { type: "string" }, speed: { type: "number" }, duration: { type: "number" } } } } }, required: ["steps"] } } }];
+
+    const systemPrompt = `
+      You are a smart drone controller. 
+      RULES:
+      1. Correct Swedish place names (e.g. "Riktig kongress" -> "Kungälv").
+      2. SPEED: If user says a number (e.g. 200), use it. If not, leave undefined.
+      3. ACTIONS: "Granska/Inspektera" -> action: "inspect".
+    `;
+
+    try {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${OPENAI_KEY}` },
+        body: JSON.stringify({ model: "gpt-4o", messages: [{ role: "system", content: systemPrompt }, { role: "user", content: text }], tools, tool_choice: { type: "function", function: { name: "plan_mission" } } })
+      });
+
+      const data = await response.json();
+      const toolCall = data.choices[0]?.message?.tool_calls?.[0];
+      if (toolCall) {
+        const args = JSON.parse(toolCall.function.arguments);
+        console.log("📋 Plan received:", args.steps);
+        await buildAndExecuteMission(args.steps);
+      }
+    } catch (e) { console.error("OpenAI Error:", e); }
+  };
+
+  const buildAndExecuteMission = async (steps: any[]) => {
+    const mission: MissionAction[] = [];
+    for (const step of steps) {
+      if (step.action === 'fly' || step.action === 'inspect') {
+        const coords = await geocodeLocation(step.location);
+        if (coords) {
+          const radiusMeters = 300; 
+          if (step.action === 'fly') {
+            mission.push({ type: 'fly', lon: coords.lon, lat: coords.lat, alt: 200, speed: step.speed });
+          } else if (step.action === 'inspect') {
+            const oneDegreeLatInMeters = 111000;
+            const radiusDeg = radiusMeters / oneDegreeLatInMeters;
+            const latRad = coords.lat * (Math.PI / 180);
+            const radiusDegLon = radiusDeg / Math.cos(latRad);
+            mission.push({ type: 'fly', lon: coords.lon + radiusDegLon, lat: coords.lat, alt: 150, speed: step.speed });
+            mission.push({ type: 'orbit', lon: coords.lon, lat: coords.lat, alt: 150, radius: radiusMeters, duration: step.duration || 20 });
+          }
+        }
+      } else if (step.action === 'wait') mission.push({ type: 'wait', duration: step.duration || 5 });
+    }
+    if (mission.length > 0) executeMission(mission);
+  };
+
+  // --- UI ---
+  const handleDestinationSearch = async (e: React.FormEvent) => { e.preventDefault(); if (!destinationQuery.trim()) return; const coords = await geocodeLocation(destinationQuery); if (coords) { teleportTo(coords.lon, coords.lat, 1000, 0, true, true); setIsDestinationOpen(false); setDestinationQuery(''); } };
+  const handleAiInspection = async (e: React.FormEvent) => { e.preventDefault(); if (!aiInspectionQuery.trim()) return; const coords = await geocodeLocation(aiInspectionQuery); if (coords) { startOrbitMode(coords.lon, coords.lat, 300, 200, 0.05); setIsAiInspectionOpen(false); setAiInspectionQuery(''); } };
+  useEffect(() => { const handleKeyPress = (e: KeyboardEvent) => { if (e.key === '?' || (e.shiftKey && e.key === '/')) { e.preventDefault(); setIsOpen(p => !p); } }; window.addEventListener('keydown', handleKeyPress); return () => window.removeEventListener('keydown', handleKeyPress); }, []);
 
   return (
     <>
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="fixed bottom-8 left-8 z-50 w-12 h-12 flex items-center justify-center
-                   glass-panel hover:bg-white/10 transition-all duration-300
-                   text-white/60 hover:text-white text-lg group"
-        title="Show Controls (?)"
-      >
-        <span className="group-hover:scale-110 transition-transform">?</span>
-      </button>
+      <button onClick={() => setIsOpen(!isOpen)} className="fixed bottom-8 left-8 z-50 w-12 h-12 flex items-center justify-center glass-panel hover:bg-white/10 transition-all text-white/60 hover:text-white text-lg group">?</button>
+      <button onClick={() => setIsDestinationOpen(!isDestinationOpen)} className="fixed bottom-8 left-24 z-50 w-12 h-12 flex items-center justify-center glass-panel hover:bg-white/10 transition-all text-white/60 hover:text-white text-lg group">🎯</button>
+      <button onClick={() => setIsAiInspectionOpen(!isAiInspectionOpen)} className="fixed bottom-8 left-40 z-50 w-12 h-12 flex items-center justify-center glass-panel hover:bg-white/10 transition-all text-white/60 hover:text-white text-lg group">🤖</button>
+      
+      {/* VOICE BUTTONS */}
+      <div className="fixed bottom-8 left-56 z-50 flex items-center gap-2">
+        <button onClick={toggleVoiceRecording} className={`w-12 h-12 flex items-center justify-center glass-panel transition-all text-lg group ${isRecording ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse' : 'hover:bg-white/10 text-white/60 hover:text-white'}`} title={isRecording ? "Stop & Send" : "Start Recording"}><span>{isRecording ? "📤" : "🎙️"}</span></button>
+        
+        {/* RENSA KNAPP */}
+        {isRecording && (
+            <button onClick={clearVoice} className="w-8 h-8 flex items-center justify-center bg-white/10 hover:bg-red-500/50 rounded-full text-white/70 hover:text-white transition-colors" title="Avbryt / Rensa">
+                ✕
+            </button>
+        )}
 
+        {isRecording && (<div className="bg-black/80 backdrop-blur px-4 py-2 rounded-lg text-white text-sm max-w-[300px] animate-fade-in border border-white/10">{voiceText || "Lyssnar..."}</div>)}
+      </div>
 
-
-      {/* Destination Button */}
-      <button
-        onClick={() => setIsDestinationOpen(!isDestinationOpen)}
-        className="fixed bottom-8 left-24 z-50 w-12 h-12 flex items-center justify-center
-                  glass-panel hover:bg-white/10 transition-all duration-300
-                  text-white/60 hover:text-white text-lg group"
-        title="Fly to Destination"
-      >
-        <span className="group-hover:scale-110 transition-transform">🎯</span>
-      </button>
-
-
-
-      {/* AI Granskning Button - FLYTTA HIT UTANFÖR PANELEN */}
-      <button
-        onClick={() => setIsAiInspectionOpen(!isAiInspectionOpen)}
-        className="fixed bottom-8 left-40 z-50 w-12 h-12 flex items-center justify-center
-                  glass-panel hover:bg-white/10 transition-all duration-300
-                  text-white/60 hover:text-white text-lg group"
-        title="AI Granskning"
-      >
-        <span className="group-hover:scale-110 transition-transform">🤖</span>
-      </button>
-
-
-
-
-      {/* Destination Search Panel */}
-      {isDestinationOpen && (
-        <div className="fixed bottom-24 left-24 z-50 animate-fade-in">
-          <Panel title="Fly to Destination" className="min-w-[280px]">
-            <form onSubmit={handleDestinationSearch}>
-              <input
-                type="text"
-                value={destinationQuery}
-                onChange={(e) => setDestinationQuery(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
-                onKeyUp={(e) => e.stopPropagation()}
-                onKeyPress={(e) => e.stopPropagation()}
-                placeholder="Enter city or address..."
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg 
-                          text-white placeholder:text-white/30
-                          focus:outline-none focus:border-blue-400/50"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="w-full mt-2 px-4 py-2 bg-blue-500 hover:bg-blue-600 
-                          text-white rounded-lg transition-colors"
-              >
-                Fly There
-              </button>
-            </form>
-          </Panel>
-        </div>
-      )}
-
-
-      {/* AI Inspection Panel */}
-      {isAiInspectionOpen && (
-        <div className="fixed bottom-24 left-40 z-50 animate-fade-in">
-          <Panel title="AI Granskning" className="min-w-[280px]">
-            <form onSubmit={handleAiInspection}>  {/* DENNA RAD SKA FINNAS */}
-              <input
-                type="text"
-                value={aiInspectionQuery}
-                onChange={(e) => setAiInspectionQuery(e.target.value)}
-                onKeyDown={(e) => e.stopPropagation()}
-                onKeyUp={(e) => e.stopPropagation()}
-                onKeyPress={(e) => e.stopPropagation()}
-                placeholder="Område att granska..."
-                className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg 
-                          text-white placeholder:text-white/30
-                          focus:outline-none focus:border-green-400/50"
-                autoFocus
-              />
-              <button
-                type="submit"
-                className="w-full mt-2 px-4 py-2 bg-green-500 hover:bg-green-600 
-                          text-white rounded-lg transition-colors"
-              >
-                Starta AI Granskning
-              </button>
-            </form>
-          </Panel>
-        </div>
-      )}
-
-      {isOpen && (
-        <div className="fixed bottom-24 left-8 z-50 animate-fade-in">
-          <Panel title={mode === 'builder' ? 'Builder Controls' : 'Controls'} className="min-w-[280px] max-h-[70vh] overflow-y-auto">
-            <div className="space-y-4">
-              {mode === 'builder' ? (
-                <>
-                  <div className="space-y-2.5">
-                    <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-2">
-                      Builder Camera
-                    </div>
-                    {BUILDER_CONTROLS.map((control, idx) => (
-                      <ControlButton key={idx} keys={control.keys} description={control.description} />
-                    ))}
-                  </div>
-
-                  <div className="border-t border-white/5 pt-4 space-y-2.5">
-                    <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-2">
-                      Modes
-                    </div>
-                    {MODE_CONTROLS.map((control, idx) => (
-                      <ControlButton key={idx} keys={control.keys} description={control.description} />
-                    ))}
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="space-y-2.5">
-                    <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-2">
-                      Vehicle
-                    </div>
-                    {VEHICLE_CONTROLS.map((control, idx) => (
-                      <ControlButton key={idx} keys={control.keys} description={control.description} />
-                    ))}
-                  </div>
-
-                  <div className="border-t border-white/5 pt-4 space-y-2.5">
-                    <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-2">
-                      Camera
-                    </div>
-                    {CAMERA_CONTROLS.map((control, idx) => (
-                      <ControlButton key={idx} keys={control.keys} description={control.description} />
-                    ))}
-                  </div>
-
-                  <div className="border-t border-white/5 pt-4 space-y-2.5">
-                    <div className="text-[10px] text-white/40 uppercase tracking-wider font-semibold mb-2">
-                      Modes
-                    </div>
-                    {MODE_CONTROLS.map((control, idx) => (
-                      <ControlButton key={idx} keys={control.keys} description={control.description} />
-                    ))}
-                  </div>
-                </>
-              )}
-
-              <div className="border-t border-white/5 pt-3">
-                <div className="text-[10px] text-white/30">
-                  Press <kbd className="px-1 py-0.5 bg-white/5 rounded text-white/50">?</kbd> to close
-                </div>
-              </div>
-            </div>
-          </Panel>
-        </div>
-      )}
+      {isDestinationOpen && (<div className="fixed bottom-24 left-24 z-50 animate-fade-in"><Panel title="Destination"><form onSubmit={handleDestinationSearch}><input autoFocus type="text" value={destinationQuery} onChange={e=>setDestinationQuery(e.target.value)} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white" placeholder="City..."/><button type="submit" className="w-full mt-2 px-4 py-2 bg-blue-500 rounded-lg text-white">Fly</button></form></Panel></div>)}
+      {isAiInspectionOpen && (<div className="fixed bottom-24 left-40 z-50 animate-fade-in"><Panel title="Inspection"><form onSubmit={handleAiInspection}><input autoFocus type="text" value={aiInspectionQuery} onChange={e=>setAiInspectionQuery(e.target.value)} className="w-full px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-white" placeholder="Area..."/><button type="submit" className="w-full mt-2 px-4 py-2 bg-green-500 rounded-lg text-white">Inspect</button></form></Panel></div>)}
+      {isOpen && (<div className="fixed bottom-24 left-8 z-50 animate-fade-in"><Panel title={mode==='builder'?'Builder':'Controls'} className="min-w-[280px] max-h-[70vh] overflow-y-auto"><div className="space-y-4">{mode==='builder'?(<>{BUILDER_CONTROLS.map((c,i)=><ControlButton key={i}{...c}/>)}</>):(<><div className="space-y-2.5"><div className="text-xs text-white/40 mb-2">VEHICLE</div>{VEHICLE_CONTROLS.map((c,i)=><ControlButton key={i}{...c}/>)}</div><div className="border-t border-white/5 pt-4 space-y-2.5"><div className="text-xs text-white/40 mb-2">CAMERA</div>{CAMERA_CONTROLS.map((c,i)=><ControlButton key={i}{...c}/>)}</div></>)}</div></Panel></div>)}
     </>
   );
 }
-
-
